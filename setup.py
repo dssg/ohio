@@ -1,3 +1,4 @@
+import re
 import sys
 from pathlib import Path
 from setuptools import setup
@@ -5,7 +6,27 @@ from setuptools import setup
 NEEDS_PYTEST = {'pytest', 'test', 'ptr'}.intersection(sys.argv)
 PYTEST_RUNNER = ['pytest-runner'] if NEEDS_PYTEST else []
 
-README_PATH = Path(__file__).parent / 'README.md'
+ROOT_PATH = Path(__file__).parent
+
+README_PATH = ROOT_PATH / 'README.md'
+
+REQUIREMENTS_TEST_PATH = ROOT_PATH / 'requirement' / 'test.txt'
+
+
+def stream_requirements(fd):
+    """For a given requirements file descriptor, generate lines of
+    distribution requirements, ignoring comments and chained requirement
+    files.
+
+    """
+    for line in fd:
+        cleaned = re.sub(r'#.*$', '', line).strip()
+        if cleaned and not cleaned.startswith('-r'):
+            yield cleaned
+
+
+with REQUIREMENTS_TEST_PATH.open() as test_requirements_file:
+    REQUIREMENTS_TEST = list(stream_requirements(test_requirements_file))
 
 
 setup(
@@ -26,5 +47,5 @@ setup(
     package_dir={'': 'src'},
     py_modules=['ohio'],
     setup_requires=PYTEST_RUNNER,
-    tests_require=['pytest'],
+    tests_require=REQUIREMENTS_TEST,
 )
