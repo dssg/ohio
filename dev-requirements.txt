@@ -1,0 +1,4 @@
+argcmdr==0.6.0
+bump2version==0.5.10
+tox==3.7.0
+twine==1.13.0
