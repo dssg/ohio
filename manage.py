@@ -13,10 +13,11 @@ class Management(LocalRoot):
         """test the codebase"""
         return (self.local.FG, self.local['tox'][args.remainder])
 
-    @local
-    def bump(self):
-        """increment package version (UNIMPLEMENTED)"""
-        raise NotImplementedError
+    @local('part', choices=('major', 'minor', 'patch'),
+           help="part of the version to be bumped")
+    def bump(self, args):
+        """increment package version"""
+        return self.local['bumpversion'][args.part]
 
     @local
     def build(self):
