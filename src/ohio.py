@@ -251,6 +251,7 @@ class PipeTextIO(StreamTextIOBase):
 
     """
     _log_debug = False
+    _none = object()
 
     buffer_queue_size = 1
     queue_wait_timeout = 0.01
@@ -274,6 +275,7 @@ class PipeTextIO(StreamTextIOBase):
             target=self._writer_write,
         )
         self._writer_started = False
+        self._writer_exc = None
 
     @property
     def _should_wait(self):
@@ -319,14 +321,21 @@ class PipeTextIO(StreamTextIOBase):
                                                   self.queue_wait_timeout)
                 except queue.Empty:
                     if not self._should_wait:
-                        raise StopIteration
+                        text = self._none
+                        break
                 else:
                     break
         else:
             try:
                 text = self._buffer_queue.get(self._should_wait)
             except queue.Empty:
-                raise StopIteration
+                text = self._none
+
+        if self._writer_exc:
+            raise self._writer_exc
+
+        if text is self._none:
+            raise StopIteration
 
         self._buffer_queue.task_done()
 
@@ -338,6 +347,9 @@ class PipeTextIO(StreamTextIOBase):
             self.__writer_func__(self)
         except IOClosed:
             self._print_log('writer', 'killed')
+        except Exception as exc:
+            self._print_log('writer', 'error: %r', exc)
+            self._writer_exc = exc
         else:
             self._print_log('writer', 'done')
 

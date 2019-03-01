@@ -368,3 +368,35 @@ class TestPipeTextIO:
 
         assert stream_writer.write_count <= 2
         assert not pipe._writer.is_alive()
+
+    @staticmethod
+    def broken_writer(pipe):
+        pipe.write("hi there\r\n")
+        pipe.write("what's up?\r\n")
+        pipe.write("(not much)\r\n")
+        raise RuntimeError('ah!')
+
+    @timeout(race_timeout)
+    @pytest.mark.parametrize('writer', (
+        # one writer which fails immediately:
+        unittest.mock.Mock(side_effect=RuntimeError),
+
+        # another writer which fails eventually:
+        broken_writer.__func__,
+    ))
+    def test_writer_exception(self, writer):
+        with ohio.PipeTextIO(writer) as pipe:
+            with pytest.raises(RuntimeError):
+                pipe.read()
+
+            # wait (with timeout)
+            for _count in range(20):
+                if not pipe._writer.is_alive():
+                    break
+
+                time.sleep(0.01)
+
+            assert not pipe._writer.is_alive()
+            assert not pipe.closed
+
+        assert pipe.closed
