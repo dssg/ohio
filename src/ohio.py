@@ -5,7 +5,7 @@ import queue
 import threading
 
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 
 class IOClosed(ValueError):
