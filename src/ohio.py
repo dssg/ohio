@@ -298,38 +298,17 @@ class PipeTextIO(StreamTextIOBase):
         #   * checking ``_should_wait`` -- (whether worker alive and could enqueue more)
         #   * worker finishing up and "dying"
         #
-        # ...But, *seemingly*, ONLY with ``_log_debug`` on, (perhaps because only then the
-        # worker is made, after enqueuing its final chunk, to acquire stdout and report
-        # about it).
-        #
-        # This is not **super-convincing**. Could there in fact still be a race condition,
-        # (but it's just especially unlikely, with ``_log_debug`` off)?
-        #
-        # The second implementation, below, is significantly *faster*. For that reason, it
-        # is preserved, and enabled by default.
-        #
-        # However, the first implementation, currently enabled only in debug mode, is
-        # preserved also in case it is nonetheless found to be useful in the future. (And,
-        # its speed impact was greatly reduced by optimizing ``queue_wait_timeout``, more
-        # of which could still perhaps be done.)
-        #
-        if self._log_debug:
+        while True:
             # handle race condition on checking Thread.is_alive
-            while True:
-                try:
-                    text = self._buffer_queue.get(self._should_wait,
-                                                  self.queue_wait_timeout)
-                except queue.Empty:
-                    if not self._should_wait:
-                        text = self._none
-                        break
-                else:
-                    break
-        else:
             try:
-                text = self._buffer_queue.get(self._should_wait)
+                text = self._buffer_queue.get(self._should_wait,
+                                              self.queue_wait_timeout)
             except queue.Empty:
-                text = self._none
+                if not self._should_wait:
+                    text = self._none
+                    break
+            else:
+                break
 
         if self._writer_exc:
             raise self._writer_exc
