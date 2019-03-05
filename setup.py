@@ -31,7 +31,7 @@ with REQUIREMENTS_TEST_PATH.open() as test_requirements_file:
 
 setup(
     name='ohio',
-    version='0.1.1',
+    version='0.1.2',
     description="I/O extras",
     long_description=README_PATH.read_text(),
     long_description_content_type='text/markdown',
