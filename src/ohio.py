@@ -249,6 +249,31 @@ class PipeTextIO(StreamTextIOBase):
         4.  The final read request returns all remaining text,
             (retrieved from the write buffer).
 
+    Concretely, this is commonly useful with the PostgreSQL COPY
+    command, for efficient data transfer, (and without the added
+    complexity of the file system). While your database interface may
+    vary, ``PipeTextIO`` enables the following syntax, for example to
+    copy data into the database::
+
+        >>> def write_csv(file_like):
+        ...     writer = csv.writer(file_like)
+        ...     ...
+
+        >>> with PipeTextIO(write_csv) as pipe, \
+        ...      connection.cursor() as cursor:
+        ...     cursor.copy_from(pipe, 'my_table', format='csv')
+
+    ...or, to copy data out of the database::
+
+        >>> with connection.cursor() as cursor:
+        ...     writer = lambda pipe: cursor.copy_to(pipe,
+        ...                                          'my_table',
+        ...                                          format='csv')
+        ...
+        ...     with PipeTextIO(writer) as pipe:
+        ...         reader = csv.reader(pipe)
+        ...         ...
+
     """
     _log_debug = False
     _none = object()
