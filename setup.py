@@ -45,7 +45,7 @@ setup(
     ],
     url="https://github.com/dssg/ohio",
     package_dir={'': 'src'},
-    py_modules=['ohio'],
+    packages=['ohio'],
     setup_requires=PYTEST_RUNNER,
     tests_require=REQUIREMENTS_TEST,
 )

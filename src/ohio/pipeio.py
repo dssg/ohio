@@ -1,168 +1,10 @@
-"""I/O extras"""
-import csv
-import io
 import queue
 import threading
 
-
-__version__ = '0.1.2'
-
-
-class IOClosed(ValueError):
-
-    _default_message_ = "I/O operation on closed file"
-
-    def __init__(self, *args):
-        if not args:
-            args = (self._default_message_,)
-
-        super().__init__(*args)
+from . import baseio
 
 
-class StreamTextIOBase(io.TextIOBase):
-    """Readable file-like abstract base class.
-
-    Concrete classes may implemented method `__next_chunk__` to return
-    chunks (or all) of the text to be read.
-
-    """
-    def __init__(self):
-        self._remainder = ''
-
-    def __next_chunk__(self):
-        raise NotImplementedError("StreamTextIOBase subclasses must implement __next_chunk__")
-
-    def readable(self):
-        if self.closed:
-            raise IOClosed()
-
-        return True
-
-    def _read1(self, size=None):
-        while not self._remainder:
-            try:
-                self._remainder = self.__next_chunk__()
-            except StopIteration:
-                break
-
-        result = self._remainder[:size]
-        self._remainder = self._remainder[len(result):]
-
-        return result
-
-    def read(self, size=None):
-        if self.closed:
-            raise IOClosed()
-
-        if size is not None and size < 0:
-            size = None
-
-        result = ''
-
-        while size is None or size > 0:
-            content = self._read1(size)
-            if not content:
-                break
-
-            if size is not None:
-                size -= len(content)
-
-            result += content
-
-        return result
-
-    def readline(self):
-        if self.closed:
-            raise IOClosed()
-
-        result = ''
-
-        while True:
-            index = self._remainder.find('\n')
-            if index == -1:
-                result += self._remainder
-                try:
-                    self._remainder = self.__next_chunk__()
-                except StopIteration:
-                    self._remainder = ''
-                    break
-            else:
-                result += self._remainder[:(index + 1)]
-                self._remainder = self._remainder[(index + 1):]
-                break
-
-        return result
-
-
-class IteratorTextIO(StreamTextIOBase):
-    """Readable file-like interface for iterable text streams."""
-
-    def __init__(self, iterable):
-        super().__init__()
-        self.__iterator__ = iter(iterable)
-
-    def __next_chunk__(self):
-        return next(self.__iterator__)
-
-
-def csv_text(rows, *args, writer=csv.writer, **kws):
-    """Encode the specified iterable of `rows` into CSV text."""
-    out = io.StringIO()
-    csv_writer = writer(out, *args, **kws)
-    csv_writer.writerows(rows)
-    return out.getvalue()
-
-
-class CsvWriterTextIO(StreamTextIOBase):
-    """csv.writer-compatible interface to encode csv & write to memory.
-
-    The writer instance may also be read, to retrieve written csv, as
-    it is written (iteratively).
-
-    """
-    make_writer = csv.writer
-
-    def __init__(self, *args, **kws):
-        super().__init__()
-        self.outfile = io.StringIO()
-        self.writer = self.make_writer(self.outfile, *args, **kws)
-
-    # csv.writer interface #
-
-    @property
-    def dialect(self):
-        return self.writer.dialect
-
-    def writerow(self, row):
-        self.writer.writerow(row)
-
-    def writerows(self, rows):
-        self.writer.writerows(rows)
-
-    # StreamTextIOBase readable interface #
-
-    def __next_chunk__(self):
-        text = self.outfile.getvalue()
-
-        if not text:
-            # NOTE: Does StreamTextIOBase make the most sense for this?
-            raise StopIteration
-
-        self.outfile.seek(0)
-        self.outfile.truncate()
-
-        return text
-
-
-class CsvDictWriterTextIO(CsvWriterTextIO):
-
-    make_writer = csv.DictWriter
-
-    def writeheader(self):
-        self.writer.writeheader()
-
-
-class PipeTextIO(StreamTextIOBase):
+class PipeTextIO(baseio.StreamTextIOBase):
     """Iteratively stream output written by given function through
     readable file-like interface.
 
@@ -349,7 +191,7 @@ class PipeTextIO(StreamTextIOBase):
     def _writer_write(self):
         try:
             self.__writer_func__(self)
-        except IOClosed:
+        except baseio.IOClosed:
             self._print_log('writer', 'killed')
         except Exception as exc:
             self._print_log('writer', 'error: %r', exc)
@@ -368,7 +210,7 @@ class PipeTextIO(StreamTextIOBase):
         self._print_log('write', '%r', text)
 
         if self.closed:
-            raise IOClosed()
+            raise baseio.IOClosed()
 
         self._buffer_queue.put(text)
 
@@ -378,6 +220,6 @@ class PipeTextIO(StreamTextIOBase):
 
     def writable(self):
         if self.closed:
-            raise IOClosed()
+            raise baseio.IOClosed()
 
         return True
