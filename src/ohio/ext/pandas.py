@@ -27,7 +27,6 @@ import functools
 
 import ohio
 import pandas
-import pandas.io.sql
 
 
 @pandas.api.extensions.register_dataframe_accessor('pg_copy_to')
@@ -59,10 +58,11 @@ class DataFramePgCopyTo:
     def __init__(self, data_frame):
         self.data_frame = data_frame
 
+    @functools.wraps(pandas.DataFrame.to_sql)
     def __call__(self, *args, **kwargs):
         self.data_frame.to_sql(
             *args,
-            method=data_frame_pg_copy_to,
+            method=to_sql_method_pg_copy_to,
             **kwargs,
         )
 
@@ -82,7 +82,7 @@ def _write_csv(rows, buffer):
     writer.writerows(rows)
 
 
-def data_frame_pg_copy_to(table, conn, keys, data_iter):
+def to_sql_method_pg_copy_to(table, conn, keys, data_iter):
     columns = ', '.join('"{}"'.format(key) for key in keys)
     if table.schema:
         table_name = '{}.{}'.format(table.schema, table.name)
@@ -102,8 +102,9 @@ def data_frame_pg_copy_to(table, conn, keys, data_iter):
         cursor.copy_expert(sql, pipe)
 
 
-@pandas.api.extensions.register_dataframe_accessor('pg_copy_from')
-class DataFramePgCopyFrom:
+def data_frame_pg_copy_from(sql, engine,
+                            index_col=None, parse_dates=False, columns=None,
+                            dtype=None, nrows=None):
     """Construct ``DataFrame`` from database table or query via
     PostgreSQL ``COPY``.
 
@@ -126,23 +127,6 @@ class DataFramePgCopyFrom:
     ``read_sql`` and ``read_csv``.
 
     """
-    # Unlike pg_copy_to, this is *not* a DataFrame instance accessor;
-    # DataFramePgCopyFrom is merely a registration shim for the
-    # static/class method, (because Pandas does not provide registration
-    # of these, and we'd prefer not to straight-up monkey-patch).
-
-    def __new__(cls, *args, **kwargs):
-        if len(args) == 1 and isinstance(args[0], pandas.DataFrame):
-            # accessed from instance
-            raise TypeError("'pg_copy_from' constructs objects of type 'DataFrame': "
-                            "df = DataFrame.pg_copy_from(...)")
-
-        return data_frame_pg_copy_from(*args, **kwargs)
-
-
-def data_frame_pg_copy_from(sql, engine,
-                            index_col=None, parse_dates=False, columns=None,
-                            dtype=None, nrows=None):
     if isinstance(engine, str):
         raise TypeError("only SQLAlchemy engine supported not 'str'")
 
@@ -183,3 +167,19 @@ def data_frame_pg_copy_from(sql, engine,
                 dtype=dtype,
                 nrows=nrows,
             )
+
+
+@pandas.api.extensions.register_dataframe_accessor('pg_copy_from')
+@functools.wraps(data_frame_pg_copy_from)
+def static_accessor_data_frame_pg_copy_from(*args, **kwargs):
+    # Unlike pg_copy_to, this is *not* a DataFrame instance accessor;
+    # static_accessor_data_frame_pg_copy_from is merely a registration
+    # shim for the static/class method, (because Pandas does not provide
+    # registration of these, and we'd prefer not to straight-up monkey-patch).
+
+    if len(args) == 1 and isinstance(args[0], pandas.DataFrame):
+        # accessed from instance
+        raise TypeError("'pg_copy_from' constructs objects of type 'DataFrame': "
+                        "df = DataFrame.pg_copy_from(...)")
+
+    return data_frame_pg_copy_from(*args, **kwargs)
