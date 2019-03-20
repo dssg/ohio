@@ -116,11 +116,33 @@ class PipeTextIO(baseio.StreamTextIOBase):
         ...         reader = csv.reader(pipe)
         ...         ...
 
+    Alternatively, writer arguments may be passed to ``PipeTextIO``::
+
+        >>> with connection.cursor() as cursor:
+        ...     with PipeTextIO(cursor.copy_to,
+        ...                     args=['my_table'],
+        ...                     kwargs={'format': 'csv'}) as pipe:
+        ...         reader = csv.reader(pipe)
+        ...         ...
+
+    (But, bear in mind, the signature of the callable passed to
+    ``PipeTextIO`` must be such that its first, anonymous argument is
+    the ``PipeTextIO`` instance.)
+
+    Consider also the above example with the helper ``pipe_text``::
+
+        >>> with connection.cursor() as cursor:
+        ...     with pipe_text(cursor.copy_to,
+        ...                    'my_table',
+        ...                    format='csv') as pipe:
+        ...         reader = csv.reader(pipe)
+        ...         ...
+
     """
     _log_debug = False
     _none = object()
 
-    buffer_queue_size = 1
+    buffer_queue_size = 10
     queue_wait_timeout = 0.01
 
     thread_daemon = True
@@ -130,11 +152,14 @@ class PipeTextIO(baseio.StreamTextIOBase):
         if cls._log_debug:
             print('[debug]', '[%s]' % where, message % message_args)
 
-    def __init__(self, writer_func):
+    def __init__(self, writer_func, args=None, kwargs=None, buffer_size=None):
         super().__init__()
 
         self.__writer_func__ = writer_func
+        self.__writer_args__ = args
+        self.__writer_kwargs__ = kwargs
 
+        self.buffer_queue_size = buffer_size or self.buffer_queue_size
         self._buffer_queue = queue.Queue(self.buffer_queue_size)
 
         self._writer = threading.Thread(
@@ -189,8 +214,10 @@ class PipeTextIO(baseio.StreamTextIOBase):
         return text
 
     def _writer_write(self):
+        args = self.__writer_args__ or ()
+        kwargs = self.__writer_kwargs__ or {}
         try:
-            self.__writer_func__(self)
+            self.__writer_func__(self, *args, **kwargs)
         except baseio.IOClosed:
             self._print_log('writer', 'killed')
         except Exception as exc:
@@ -223,3 +250,15 @@ class PipeTextIO(baseio.StreamTextIOBase):
             raise baseio.IOClosed()
 
         return True
+
+
+def pipe_text(writer_func, *args, buffer_size=None, **kwargs):
+    return PipeTextIO(
+        writer_func,
+        args=args,
+        kwargs=kwargs,
+        buffer_size=buffer_size,
+    )
+
+
+pipe_text.__doc__ = PipeTextIO.__doc__
