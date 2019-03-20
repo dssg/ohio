@@ -32,7 +32,7 @@ class TestPipeTextIO:
 
     @pytest.fixture
     def pipe(self, stream_writer):
-        return ohio.PipeTextIO(stream_writer)
+        return ohio.PipeTextIO(stream_writer, buffer_size=1)
 
     def test_context_manager(self, pipe):
         assert not pipe.closed
@@ -193,3 +193,41 @@ class TestPipeTextIO:
             assert not pipe.closed
 
         assert pipe.closed
+
+    def test_interface_buffer_size(self, stream_writer):
+        pipe = ohio.PipeTextIO(stream_writer, buffer_size=1000)
+        assert pipe.buffer_queue_size == 1000
+        assert pipe._buffer_queue.maxsize == 1000
+
+    @staticmethod
+    def needy_writer(pipe, stream_writer, *, flag):
+        assert flag == 'test'
+        return stream_writer(pipe)
+
+    def test_interface_args_kwargs(self, stream_writer):
+        writer_mock = unittest.mock.Mock(side_effect=self.needy_writer)
+
+        with ohio.PipeTextIO(
+            writer_mock,
+            [stream_writer],
+            {'flag': 'test'},
+        ) as pipe:
+            assert pipe.read()
+
+        writer_mock.assert_called_once_with(pipe, stream_writer, flag='test')
+
+    def test_helper_pipe_text(self, stream_writer):
+        writer_mock = unittest.mock.Mock(side_effect=self.needy_writer)
+
+        with ohio.pipe_text(
+            writer_mock,
+            stream_writer,
+            flag='test',
+            buffer_size=100,
+        ) as pipe:
+            assert pipe.read()
+
+        assert pipe.buffer_queue_size == 100
+        assert pipe._buffer_queue.maxsize == 100
+
+        writer_mock.assert_called_once_with(pipe, stream_writer, flag='test')
