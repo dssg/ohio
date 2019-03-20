@@ -54,15 +54,25 @@ class DataFramePgCopyTo:
     ``pg_copy_to`` supports all the same parameters as ``to_sql``,
     (excepting parameter ``method``).
 
+    In addition to the signature of ``to_sql``, ``pg_copy_to`` accepts
+    the optimization parameter ``buffer_size``, which controls the
+    maximum number of CSV-encoded write results to hold in memory prior
+    to their being read into the database. Depending on use-case,
+    increasing this value may speed up the operation, at the cost of
+    additional memory -- and vice-versa. ``buffer_size`` defaults to
+    ``100``.
+
     """
     def __init__(self, data_frame):
         self.data_frame = data_frame
 
     @functools.wraps(pandas.DataFrame.to_sql)
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, buffer_size=100, **kwargs):
+        to_sql_method = functools.partial(to_sql_method_pg_copy_to,
+                                          buffer_size=buffer_size)
         self.data_frame.to_sql(
             *args,
-            method=to_sql_method_pg_copy_to,
+            method=to_sql_method,
             **kwargs,
         )
 
@@ -77,12 +87,12 @@ class DataFramePgCopyTo:
         #     )
 
 
-def _write_csv(rows, buffer):
+def _write_csv(buffer, rows):
     writer = csv.writer(buffer)
     writer.writerows(rows)
 
 
-def to_sql_method_pg_copy_to(table, conn, keys, data_iter):
+def to_sql_method_pg_copy_to(table, conn, keys, data_iter, buffer_size):
     columns = ', '.join('"{}"'.format(key) for key in keys)
     if table.schema:
         table_name = '{}.{}'.format(table.schema, table.name)
@@ -95,16 +105,17 @@ def to_sql_method_pg_copy_to(table, conn, keys, data_iter):
     )
 
     # Note: this could use a csv stream rather than csv.writer
-    writer = functools.partial(_write_csv, data_iter)
-
-    with ohio.PipeTextIO(writer) as pipe, \
+    with ohio.pipe_text(_write_csv,
+                        data_iter,
+                        buffer_size=buffer_size) as pipe, \
             conn.connection.cursor() as cursor:
         cursor.copy_expert(sql, pipe)
 
 
 def data_frame_pg_copy_from(sql, engine,
                             index_col=None, parse_dates=False, columns=None,
-                            dtype=None, nrows=None):
+                            dtype=None, nrows=None,
+                            buffer_size=100):
     """Construct ``DataFrame`` from database table or query via
     PostgreSQL ``COPY``.
 
@@ -125,6 +136,14 @@ def data_frame_pg_copy_from(sql, engine,
 
     ``pg_copy_from`` supports many of the same parameters as
     ``read_sql`` and ``read_csv``.
+
+    In addition, ``pg_copy_from`` accepts the optimization parameter
+    ``buffer_size``, which controls the maximum number of CSV-encoded
+    results written by the database cursor to hold in memory prior to
+    their being read into the ``DataFrame``. Depending on use-case,
+    increasing this value may speed up the operation, at the cost of
+    additional memory -- and vice-versa. ``buffer_size`` defaults to
+    ``100``.
 
     """
     if isinstance(engine, str):
@@ -159,7 +178,7 @@ def data_frame_pg_copy_from(sql, engine,
             'COPY {source} TO STDOUT WITH CSV HEADER'.format(source=source),
         )
 
-        with ohio.PipeTextIO(writer) as pipe:
+        with ohio.pipe_text(writer, buffer_size=buffer_size) as pipe:
             return pandas.read_csv(
                 pipe,
                 index_col=index_col,
