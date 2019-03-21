@@ -76,8 +76,10 @@ class DataFramePgCopyTo:
             **kwargs,
         )
 
-        # previously (but this couldn't easily support all of to_sql's features):
-        # with ohio.PipeTextIO(self.data_frame.to_csv) as pipe, \
+        # NOTE: this was previously implemented as follows;
+        # (but, this couldn't easily support all of to_sql's features):
+        #
+        # with ohio.pipe_text(self.data_frame.to_csv) as pipe, \
         #         contextlib.closing(engine.raw_connection()) as conn:
         #     cursor = conn.cursor()
         #
