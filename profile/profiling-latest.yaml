@@ -1,0 +1,23 @@
+ohio_pg_copy_from_1:
+        time: 91.45
+        memory: 962
+
+ohio_pg_copy_from_10:
+        time: 64.94
+        memory: 933
+
+ohio_pg_copy_from_100:
+        time: 64.39
+        memory: 1003
+
+ohio_pg_copy_from_1000:
+        time: 63.7
+        memory: 931
+
+pandas_read_sql:
+        time: 101.67
+        memory: 5228
+
+pandas_read_csv_stringio:
+        time: 73.65
+        memory: 2646
