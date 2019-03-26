@@ -9,7 +9,7 @@ primitives, to help ensure the efficiency, clarity and elegance of
 your code.
 
 For higher-level examples of what Ohio can do for you, see
-`Extensions`_.
+`Extensions`_ and `Recipes`_.
 
 
 Contents
@@ -49,6 +49,10 @@ available from `pypi.org <https://pypi.org/project/ohio/>`_:
 
 Modules
 =======
+
+   * `Recipes`_
+
+      * `dbjoin`_
 
 
 csvio
@@ -738,3 +742,86 @@ copy_stringio_to_db
    ``DataFrame`` data are written and encoded to a ``StringIO``, and
    then read by a PostgreSQL database-connected cursor’s ``COPY``
    command.
+
+.. _recipes:
+
+
+Recipes
+=======
+
+Stand-alone modules implementing functionality which depends upon Ohio
+primitives.
+
+
+dbjoin
+------
+
+Join the “COPY” results of arbitrary database queries in Python,
+without unnecessary memory overhead.
+
+This is largely useful to work around databases’ per-query column
+limit.
+
+**ohio.recipe.dbjoin.pg_join_queries(queries, engine, sep=', ',
+end='\n', copy_options=('CSV', 'HEADER'))**
+
+   Join the text-encoded result streams of an arbitrary number of
+   PostgreSQL database queries to work around the database’s per-query
+   column limit.
+
+   Query results are read via PostgreSQL ``COPY``, streamed through
+   ``PipeTextIO``, and joined line-by-line into a singular stream.
+
+   For example, given a set of database queries whose results cannot
+   be combined into a single PostgreSQL query, we might join these
+   queries’ results and write these results to a file-like object:
+
+   ::
+
+      >>> queries = [
+      ...     'SELECT a, b, c FROM a_table',
+      ...     ...
+      ... ]
+
+      >>> with open('results.csv', 'w', newline='') as fdesc:
+      ...     for line in pg_join_queries(queries, engine):
+      ...         fdesc.write(line)
+
+   Or, we might read these results into a single Pandas DataFrame:
+
+   ::
+
+      >>> csv_lines = pg_join_queries(queries, engine)
+      >>> csv_buffer = ohio.IteratorTextIO(csv_lines)
+      >>> df = pandas.read_csv(csv_buffer)
+
+   By default, ``pg_join_queries`` requests CSV-encoded results, with
+   an initial header line indicating the result columns. These
+   options, which are sent directly to the PostgreSQL ``COPY``
+   command, may be controlled via ``copy_options``. For example, to
+   omit the CSV header:
+
+   ::
+
+      >>> pg_join_queries(queries, engine, copy_options=['CSV'])
+
+   Or, to request PostgreSQL’s tab-delimited text format via the
+   syntax of PostgreSQL v9.0+:
+
+   ::
+
+      >>> pg_join_queries(
+      ...     queries,
+      ...     engine,
+      ...     sep='\t',
+      ...     copy_options={'FORMAT': 'TEXT'},
+      ... )
+
+   In the above example, we’ve instructed PostgreSQL to use its
+   ``text`` results encoder, (and we’ve omitted the instruction to
+   include a header).
+
+   **NOTE**: In the last example, we also explicitly specified the
+   separator used in the results’ encoding. This is not passed to the
+   database; rather, it is necessary for ``pg_join_queries`` to
+   properly join queries’ results.

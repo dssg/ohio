@@ -5,7 +5,7 @@ Ohio
 
 .. automodule:: ohio
 
-    For higher-level examples of what Ohio can do for you, see `Extensions`_.
+    For higher-level examples of what Ohio can do for you, see `Extensions`_ and `Recipes`_.
 
 
 .. contents::
@@ -164,6 +164,16 @@ Modules
         ``DataFrame`` data are written and encoded to a ``StringIO``,
         and then read by a PostgreSQL database-connected cursor's
         ``COPY`` command.
+
+
+.. _Recipes:
+
+.. automodule:: ohio.recipe
+
+    .. automodule:: ohio.recipe.dbjoin
+
+        .. autofunction:: ohio.recipe.dbjoin.pg_join_queries
+
 
 .. only:: not noindex
 
