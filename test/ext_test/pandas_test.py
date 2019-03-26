@@ -4,8 +4,6 @@ from datetime import datetime
 import numpy
 import pandas
 import pytest
-import sqlalchemy
-import testing.postgresql
 
 import ohio.ext.pandas  # noqa
 
@@ -18,13 +16,6 @@ class TestPandasExt:
     def table_exists(table, engine):
         result = engine.execute(f"select to_regclass('{table}')").scalar()
         return bool(result)
-
-    @pytest.fixture
-    def engine(self):
-        with testing.postgresql.Postgresql() as postgresql:
-            engine = sqlalchemy.create_engine(postgresql.url())
-            yield engine
-            engine.dispose()
 
     @pytest.fixture(name='df')
     def names_df(self):
