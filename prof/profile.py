@@ -110,7 +110,8 @@ def pandas_read_csv_stringio(engine, query):
 
 
 def main(prog=None, argv=None):
-    parser = argparse.ArgumentParser(prog=prog)
+    parser = argparse.ArgumentParser(prog=prog,
+                                     description="profile the codebase")
     parser.add_argument('data_path', type=pathlib.Path,
                         help="path to csv data file to load as input")
     parser.add_argument('-t', '--table', default='profiling', dest='table_name',
