@@ -1,7 +1,7 @@
 import re
 import sys
 from pathlib import Path
-from setuptools import setup
+from setuptools import find_packages, setup
 
 NEEDS_PYTEST = {'pytest', 'test', 'ptr'}.intersection(sys.argv)
 PYTEST_RUNNER = ['pytest-runner'] if NEEDS_PYTEST else []
@@ -45,7 +45,7 @@ setup(
     ],
     url="https://github.com/dssg/ohio",
     package_dir={'': 'src'},
-    packages=['ohio'],
+    packages=find_packages('src'),
     setup_requires=PYTEST_RUNNER,
     tests_require=REQUIREMENTS_TEST,
 )
