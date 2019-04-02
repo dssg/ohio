@@ -1,11 +1,14 @@
+import collections
 import contextlib
 import csv
 import functools
 import gc
 import math
 import re
+import shutil
 import timeit
 
+import pandas
 import sqlalchemy
 import testing.postgresql
 from memory_profiler import memory_usage
@@ -33,11 +36,77 @@ class ConfigWrapper(SharingContextDecorator):
 loadconfig = ConfigWrapper()
 
 
-class ProfilerRegistry(list):
+class ResultsWrapper(SharingContextDecorator):
 
-    def __call__(self, func):
-        self.append(func)
-        return func
+    def __init__(self):
+        self.results = collections.defaultdict(lambda: collections.defaultdict(list))
+
+    def get(self, func):
+        return self.results[func.__name__]
+
+    def save(self, func, **kwargs):
+        for (key, value) in kwargs.items():
+            self.results[func.__name__][key].append(value)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return
+
+
+results = ResultsWrapper()
+
+
+class ProfilerRegistry(collections.defaultdict):
+
+    def __init__(self):
+        super().__init__(list)
+
+    def __call__(self, func_or_tag, tag=None):
+        if callable(func_or_tag):
+            if tag is None:
+                tag = getattr(func_or_tag, '__tag__', None)
+            self[tag].append(func_or_tag)
+            return func_or_tag
+        elif tag:
+            raise TypeError("multiple tags specified?")
+        else:
+            return functools.partial(self, tag=func_or_tag)
+
+    def filtered(self):
+        # sort & ensure untagged are last
+        ordered = sorted(
+            self.items(),
+            key=lambda pair: self._sort_key(pair[0]),
+        )
+
+        return {
+            key: list(filter(self._include_profiler, profilers))
+            for (key, profilers) in ordered
+            if self._include_tag(key)
+        }
+
+    @staticmethod
+    def _sort_key(key, last=('z' * 10_000)):
+        """Sort profiler groups alphabetically by tag name.
+
+        Ensure untagged (``None``) come *last*.
+
+        """
+        return last if key is None else key
+
+    @staticmethod
+    @loadconfig
+    def _include_profiler(config, profiler):
+        return not config.filters or all(filter_.search(profiler.__name__)
+                                         for filter_ in config.filters)
+
+    @staticmethod
+    @loadconfig
+    def _include_tag(config, tag):
+        return not config.tag_filters or all(filter_.search(tag or '')
+                                             for filter_ in config.tag_filters)
 
 
 profiler = ProfilerRegistry()
@@ -76,6 +145,22 @@ def report_input(config):
 report_input.__name__ = 'input'
 
 
+def banner(message, fill, padding=' '):
+    message = f'{padding}{message}{padding}'
+    term_size = shutil.get_terminal_size()
+    columns = term_size.columns
+    fill_size = int((columns - len(message)) / 2)
+    print(fill_size * fill + message + fill_size * fill)
+
+
+def report_trial(trial_count):
+    banner(f'trial {trial_count}', fill='*')
+
+
+def report_tag(tag):
+    banner(tag, '-')
+
+
 def free():
     mem_stats = memory_usage((gc.collect,))
     mem0 = math.ceil(mem_stats[0])
@@ -84,13 +169,26 @@ def free():
     report(free, 'memory (mb):', mem0, '→', mem1, f'({freed} freed)')
 
 
-@contextmanager
-def time():
-    try:
+# @contextmanager
+# def time():
+#     try:
+#         start = timeit.default_timer()
+#         yield
+#     finally:
+#         report('time (s):', round(timeit.default_timer() - start, 2))
+
+class time(Wrapper):
+
+    @results
+    def __call__(self, results, *args, **kwargs):
         start = timeit.default_timer()
-        yield
-    finally:
-        report('time (s):', round(timeit.default_timer() - start, 2))
+        result = self.__wrapped__(*args, **kwargs)
+        duration = round(timeit.default_timer() - start, 2)
+
+        report('time (s):', duration)
+        results.save(self.__wrapped__, time=duration)
+
+        return result
 
 
 class dtypes(Wrapper):
@@ -106,7 +204,8 @@ class dtypes(Wrapper):
 
 class mprof(Wrapper):
 
-    def __call__(self, *args, **kwargs):
+    @results
+    def __call__(self, results, *args, **kwargs):
         result = None
 
         def inner():
@@ -120,10 +219,16 @@ class mprof(Wrapper):
         mem_added = mem1 - mem0
         report('memory used (mb):', mem0, '→', mem1, f'({mem_added} added)')
 
-        mem_result = result.memory_usage(index=True, deep=True).sum() / 1024 / 1024
-        report('memory result (mb):', math.ceil(mem_result))
+        if isinstance(result, pandas.DataFrame):
+            mem_result = result.memory_usage(index=True, deep=True).sum() / 1024 / 1024
+            report('memory result (mb):', math.ceil(mem_result))
+        else:
+            mem_result = 0
 
-        report('memory overhead (mb):', math.ceil(mem1 - mem_result))
+        mem_overhead = math.ceil(mem1 - mem_result)
+        report('memory overhead (mb):', mem_overhead)
+
+        results.save(self.__wrapped__, memory=mem_overhead)
 
         return result
 
@@ -136,6 +241,19 @@ def sizecheck(func):
         return df
 
     return wrapped
+
+
+class countcheck(Wrapper):
+
+    @loadconfig
+    def __call__(self, config, *args, **kwargs):
+        result = self.__wrapped__(*args, **kwargs)
+
+        (engine,) = (arg for arg in args if isinstance(arg, sqlalchemy.engine.Engine))  # FIXME?
+        count = engine.execute(f'select count(1) from {config.table_name}').scalar()
+        report('count table (rows):', count)
+
+        return result
 
 
 @contextmanager
@@ -162,17 +280,21 @@ def column_type(column, default='varchar'):
     return default
 
 
-@loaddb.manager
 @loadconfig
+def create_table(config, header, engine):
+    (columns,) = csv.reader((header,))
+    col_defn = ', '.join(f'{column} ' + column_type(column)
+                         for column in columns)
+
+    engine.execute(f'create table {config.table_name} ({col_defn})')
+
+
+@loaddb.manager
+@loadconfig.manager
 def loaddata(config, engine):
     with config.data_path.open() as fd:
         header = next(fd)
-
-        (columns,) = csv.reader((header,))
-        col_defn = ', '.join(f'{column} ' + column_type(column)
-                             for column in columns)
-
-        engine.execute(f'create table {config.table_name} ({col_defn})')
+        create_table(header, engine)
 
         with contextlib.closing(engine.raw_connection()) as conn:
             cursor = conn.cursor()
@@ -183,3 +305,41 @@ def loaddata(config, engine):
             conn.commit()
 
     yield engine
+
+
+@loadconfig.manager
+def loadframe(config):
+    yield pandas.read_csv(config.data_path, index_col='entity_id', parse_dates=True)
+
+
+@loadconfig.manager
+def loadquery(config):
+    yield f'select * from {config.table_name}'
+
+
+@results
+def handle_method(results, method, shared_results, result_keys):
+    """Execute a profiler method (from a child process)."""
+    method_results = results.get(method)
+    current_lengths = [(key, len(method_results[key])) for key in result_keys]
+
+    method()
+
+    for (index, (key, length0)) in enumerate(current_lengths):
+        key_results = method_results[key]
+        assert len(key_results) == length0 + 1
+        shared_results[index] = key_results[length0]
+
+
+@results
+def save_child_results(results, method, shared_results, result_keys):
+    """Save results on behalf of the given profiler method.
+
+    Profiler decorators are expected to store results themselves,
+    in-process; this helper can be used to populate results generated
+    in a child process, (having been returned by ``handle_method``).
+
+    """
+    rounded_values = (round(result, 2) for result in shared_results)
+    method_results = dict(zip(result_keys, rounded_values))
+    results.save(method, **method_results)

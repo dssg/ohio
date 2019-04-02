@@ -12,17 +12,54 @@ def histogram(stream):
 
 # contextlib improvements #
 
+class Wrapper:
+
+    def __init__(self, func):
+        functools.update_wrapper(self, func)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.__wrapped__})"
+
+
 class _SharingMixin:
 
-    def __call__(self, func):
-        @functools.wraps(func)
-        def inner(*args, **kwds):
+    class ContextWrapped(Wrapper):
+
+        class BoundWrapper:
+
+            def __init__(self, wrapped, instance):
+                self.__func__ = wrapped
+                self.__self__ = instance
+
+            def __call__(self, *args, **kwargs):
+                return self.__func__._call_(self.__self__, *args, **kwargs)
+
+        def __init__(self, cm, func):
+            super().__init__(func)
+            self.cm = cm
+
+        def __get__(self, instance, cls=None):
+            if instance is not None:
+                return self.BoundWrapper(self, instance)
+
+            return self
+
+        def _call_(self, instance, *args, **kwargs):
             # unlike the builtin, we'll pass the result of __enter__ to the
             # decorated function as an initial argument
-            with self._recreate_cm() as ctx:
+            with self.cm._recreate_cm() as ctx:
                 ctx_args = () if ctx is None else (ctx,)
-                return func(*(ctx_args + args), **kwds)
-        return inner
+                inner_self = () if instance is None else (instance,)
+                return self.__wrapped__(*(inner_self + ctx_args + args), **kwargs)
+
+        def __call__(self, *args, **kwargs):
+            return self._call_(None, *args, **kwargs)
+
+        def __repr__(self):
+            return f"{self.__class__.__name__}({self.cm}, {self.__wrapped__})"
+
+    def __call__(self, func):
+        return self.ContextWrapped(self, func)
 
 
 class _ComposingMixin:
@@ -30,20 +67,22 @@ class _ComposingMixin:
     def _get_cm(self):
         return self
 
-    def _wrap(self, func):
-        return contextmanager(func)
+    @property
+    def _wrapper(self):
+        return contextmanager
 
     def manager(self, func):
         """construct contextmanager that requires (composes) another."""
-        inner = self._wrap(func)
+        inner = func if isinstance(func, self._wrapper) else self._wrapper(func)
 
         @functools.wraps(func)
         def composition(*args, **kwds):
             with self._get_cm() as ctx0:
-                with inner(ctx0) as ctx1:
+                ctx_args = () if ctx0 is None else (ctx0,)
+                with inner(*(ctx_args + args), **kwds) as ctx1:
                     yield ctx1
 
-        return self._wrap(composition)
+        return self._wrapper(composition)
 
 
 class SharingContextDecorator(_SharingMixin, _ComposingMixin, contextlib.ContextDecorator):
@@ -53,13 +92,9 @@ class SharingContextDecorator(_SharingMixin, _ComposingMixin, contextlib.Context
 # better contextmanager
 
 class _SharingGeneratorContextManager(_SharingMixin, contextlib._GeneratorContextManager):
-    pass
 
-
-class Wrapper:
-
-    def __init__(self, func):
-        functools.update_wrapper(self, func)
+    def __repr__(self):
+        return f"contextmanager({self.func})"
 
 
 class contextmanager(_ComposingMixin, Wrapper):

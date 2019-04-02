@@ -17,7 +17,19 @@ class Management(LocalRoot):
            help='for help with underlying command: "manage profile - -h"')
     def profile(self, args):
         """profile the codebase"""
-        return (self.local.FG, self.local['python']['-m', 'prof'][args.remainder])
+        # -flags intended for subprocess must be distinguished by
+        # preceding empty flag / argument "-" or "--"
+        # (Or else argparse will copmlain.)
+        # But, we don't want to send these on to the subcommand.
+        if args.remainder and args.remainder[0] in '--':
+            remainder = args.remainder[1:]
+        else:
+            remainder = args.remainder[:]
+
+        try:
+            yield (self.local.FG, self.local['python']['-m', 'prof'][remainder])
+        except self.local.ProcessExecutionError as exc:
+            raise SystemExit(exc.retcode)
 
     @local('part', choices=('major', 'minor', 'patch'),
            help="part of the version to be bumped")
