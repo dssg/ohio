@@ -24,9 +24,14 @@ environment.
 import contextlib
 import csv
 import functools
+import random
 
 import ohio
 import pandas
+
+
+def _get_cursor_name(prefix):
+    return '{}{:0>3}'.format(prefix, random.randint(0, 999))
 
 
 @pandas.api.extensions.register_dataframe_accessor('pg_copy_to')
@@ -62,14 +67,29 @@ class DataFramePgCopyTo:
     additional memory -- and vice-versa. ``buffer_size`` defaults to
     ``100``.
 
+    The optimization parameter ``iter_size`` may also be specified,
+    which instructs ``pg_copy_to`` to use the named cursor feature of
+    ``psycopg2``, (and so a server-size cursor), with the given *cursor*
+    buffer ("iter") size. This parameter allows the user even lower-
+    level control, over the number of database requests that are made,
+    and the number of database results to hold in memory prior to their
+    being read from the cursor.
+
+    **Note**: This level of optimizational tuning, (especially
+    ``iter_size``), *may not* produce a significant, measurable result
+    for your task. For that matter, you might find the SQLAlchemy
+    connection ``execution_option`` -- ``stream_results=True`` -- at
+    least as useful. Consider performance profiling your task.
+
     """
     def __init__(self, data_frame):
         self.data_frame = data_frame
 
     @functools.wraps(pandas.DataFrame.to_sql)
-    def __call__(self, *args, buffer_size=100, **kwargs):
+    def __call__(self, *args, buffer_size=100, iter_size=None, **kwargs):
         to_sql_method = functools.partial(to_sql_method_pg_copy_to,
-                                          buffer_size=buffer_size)
+                                          buffer_size=buffer_size,
+                                          iter_size=iter_size)
         self.data_frame.to_sql(
             *args,
             method=to_sql_method,
@@ -94,7 +114,7 @@ def _write_csv(buffer, rows):
     writer.writerows(rows)
 
 
-def to_sql_method_pg_copy_to(table, conn, keys, data_iter, buffer_size):
+def to_sql_method_pg_copy_to(table, conn, keys, data_iter, buffer_size, iter_size):
     columns = ', '.join('"{}"'.format(key) for key in keys)
     if table.schema:
         table_name = '{}.{}'.format(table.schema, table.name)
@@ -106,18 +126,27 @@ def to_sql_method_pg_copy_to(table, conn, keys, data_iter, buffer_size):
         columns=columns,
     )
 
+    if iter_size:
+        cursor_name = _get_cursor_name('df_copy_to_')
+    else:
+        cursor_name = None
+
     # Note: this could use a csv stream rather than csv.writer
     with ohio.pipe_text(_write_csv,
                         data_iter,
                         buffer_size=buffer_size) as pipe, \
-            conn.connection.cursor() as cursor:
+            conn.connection.cursor(name=cursor_name) as cursor:
+
+        if iter_size:
+            cursor.itersize = iter_size
+
         cursor.copy_expert(sql, pipe)
 
 
 def data_frame_pg_copy_from(sql, engine,
                             index_col=None, parse_dates=False, columns=None,
                             dtype=None, nrows=None,
-                            buffer_size=100):
+                            buffer_size=100, iter_size=None):
     """Construct ``DataFrame`` from database table or query via
     PostgreSQL ``COPY``.
 
@@ -139,13 +168,27 @@ def data_frame_pg_copy_from(sql, engine,
     ``pg_copy_from`` supports many of the same parameters as
     ``read_sql`` and ``read_csv``.
 
-    In addition, ``pg_copy_from`` accepts the optimization parameter
+    ``pg_copy_from`` also accepts the optimization parameter
     ``buffer_size``, which controls the maximum number of CSV-encoded
     results written by the database cursor to hold in memory prior to
     their being read into the ``DataFrame``. Depending on use-case,
     increasing this value may speed up the operation, at the cost of
     additional memory -- and vice-versa. ``buffer_size`` defaults to
     ``100``.
+
+    In addition, the optimization parameter ``iter_size`` may be
+    specified, which instructs ``pg_copy_from`` to use the named cursor
+    feature of ``psycopg2``, (and so a server-size cursor), with the
+    given *cursor* buffer ("iter") size. This parameter allows the user
+    even lower-level control, over the number of database requests that
+    are made, and the number of database results to hold in memory prior
+    to their being read from the cursor.
+
+    **Note**: This level of optimizational tuning, (especially
+    ``iter_size``), *may not* produce a significant, measurable result
+    for your task. For that matter, you might find the SQLAlchemy
+    connection ``execution_option`` -- ``stream_results=True`` -- at
+    least as useful. Consider performance profiling your task.
 
     """
     if isinstance(engine, str):
@@ -172,8 +215,16 @@ def data_frame_pg_copy_from(sql, engine,
     else:
         source = "({})".format(sql)
 
+    if iter_size:
+        cursor_name = _get_cursor_name('df_copy_from_')
+    else:
+        cursor_name = None
+
     with contextlib.closing(engine.raw_connection()) as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(name=cursor_name)
+
+        if iter_size:
+            cursor.itersize = iter_size
 
         writer = functools.partial(
             cursor.copy_expert,
