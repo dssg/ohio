@@ -1,5 +1,9 @@
 import contextlib
+import csv
+import functools
 import io
+
+import pandas
 
 import prof.tool
 from prof.tool import (
@@ -59,7 +63,7 @@ def pandas_to_sql_multi_1000(config, df, engine):
 @countcheck
 @mprof
 @time
-def copy_stringio_to_db(config, df, engine):
+def generic_copy_stringio_to_db(config, df, engine):
     """DataFrame → StringIO → COPY"""
     with config.data_path.open() as fd:
         header = next(fd)
@@ -77,6 +81,54 @@ def copy_stringio_to_db(config, df, engine):
             buffer,
         )
         conn.commit()
+
+
+@pandas.api.extensions.register_dataframe_accessor('stringio_copy_to')
+class DataFrameStringIOCopyTo:
+
+    def __init__(self, data_frame):
+        self.data_frame = data_frame
+
+    @functools.wraps(pandas.DataFrame.to_sql)
+    def __call__(self, *args, **kwargs):
+        self.data_frame.to_sql(
+            *args,
+            method=self.copy_to,
+            **kwargs,
+        )
+
+    @staticmethod
+    def copy_to(table, conn, keys, data_iter):
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerows(data_iter)
+        buffer.seek(0)
+
+        columns = ', '.join('"{}"'.format(key) for key in keys)
+        if table.schema:
+            table_name = '{}.{}'.format(table.schema, table.name)
+        else:
+            table_name = table.name
+
+        sql = 'COPY {table_name} ({columns}) FROM STDIN WITH CSV'.format(
+            table_name=table_name,
+            columns=columns,
+        )
+
+        with conn.connection.cursor() as cursor:
+            cursor.copy_expert(sql, buffer)
+
+
+@profiler
+@loaddb
+@loadframe
+@loadconfig
+@countcheck
+@mprof
+@time
+def copy_stringio_to_db(config, df, engine):
+    """stringio_copy_to {DataFrame → StringIO → COPY}"""
+    df.stringio_copy_to(config.table_name, engine)
 
 
 @profiler
