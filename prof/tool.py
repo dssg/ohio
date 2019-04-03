@@ -17,7 +17,26 @@ from .util import contextmanager, SharingContextDecorator, wrapper
 
 
 class ConfigWrapper(SharingContextDecorator):
+    """Context manager and decorator providing a configuration sentinel.
 
+    If accessed prior to configuration being ``set``, raises
+    ``RuntimeError``.
+
+    As a context manager::
+
+        with loadconfig as config:
+            ...
+
+    As a decorator::
+
+        @loadconfig
+        def my_func(config):
+            return config.some_key
+
+    Invoking ``my_func()`` without arguments would return the config
+    value associated with ``some_key``.
+
+    """
     def __init__(self, config=None):
         self.config = config
 
@@ -37,7 +56,26 @@ loadconfig = ConfigWrapper()
 
 
 class ResultsWrapper(SharingContextDecorator):
+    """Context manager and decorator providing a sentinel of profiling
+    results.
 
+    Profiling data may be recorded for a given profiler function via
+    ``save``::
+
+        @results
+        def measure_something(results, func, *args, **kwargs):
+            func_result = func(*args, **kwargs)
+            results.save(func, some_thing=some_value)
+            return func_result
+
+    ...and retrieved via ``get``::
+
+        @results
+        def process_results(results, func):
+            func_results = results.get(func)
+            ...
+
+    """
     def __init__(self):
         self.results = collections.defaultdict(lambda: collections.defaultdict(list))
 
@@ -59,7 +97,32 @@ results = ResultsWrapper()
 
 
 class ProfilerRegistry(collections.defaultdict):
+    """Profiler registry and function decorator.
 
+    Register a function as a profiler::
+
+        profiler = ProfilerRegistry()
+
+        @profiler
+        def profile_this():
+            ...
+
+    ...or, with a tag::
+
+        @profiler('slow')
+        def profile_slow():
+            ...
+
+    Profiler tags can also be specified by attribute::
+
+        def profile_slow():
+            ...
+
+        profile_slow.__tag__ = 'slow'
+
+        profiler(profile_slow)
+
+    """
     def __init__(self):
         super().__init__(list)
 
@@ -75,6 +138,10 @@ class ProfilerRegistry(collections.defaultdict):
             return functools.partial(self, tag=func_or_tag)
 
     def filtered(self):
+        """Construct a dictionary of configuration-selected profilers
+        categorized and sorted by tag.
+
+        """
         # sort & ensure untagged are last
         ordered = sorted(
             self.items(),
@@ -113,6 +180,7 @@ profiler = ProfilerRegistry()
 
 
 class Reporter:
+    """Report information associated with the current profiler."""
 
     def __init__(self):
         self.last_func = None
@@ -130,6 +198,7 @@ report = Reporter()
 
 @loadconfig
 def report_input(config):
+    """Report the size and shape of provided input data."""
     with config.data_path.open() as fd:
         header = next(fd)
 
@@ -146,6 +215,10 @@ report_input.__name__ = 'input'
 
 
 def banner(message, fill, padding=' '):
+    """Print the given message as a banner with ``fill`` characters
+    filling the width of the terminal.
+
+    """
     message = f'{padding}{message}{padding}'
     term_size = shutil.get_terminal_size()
     columns = term_size.columns
@@ -162,6 +235,10 @@ def report_tag(tag):
 
 
 def free():
+    """Force a garbage collector run and report on the process's current
+    memory use.
+
+    """
     mem_stats = memory_usage((gc.collect,))
     mem0 = math.ceil(mem_stats[0])
     mem1 = math.ceil(mem_stats[-1])
@@ -180,6 +257,10 @@ def free():
 @wrapper
 @results
 def time(results, func, *args, **kwargs):
+    """Report and record the execution time in seconds for the decorated
+    function upon each invocation.
+
+    """
     start = timeit.default_timer()
     result = func(*args, **kwargs)
     duration = round(timeit.default_timer() - start, 2)
@@ -192,6 +273,10 @@ def time(results, func, *args, **kwargs):
 
 @wrapper
 def dtypes(func, *args, **kwargs):
+    """Report the Pandas dtypes of the DataFrame returned by the
+    decorated function.
+
+    """
     result = func(*args, **kwargs)
 
     dtypes = collections.Counter(map(str, result.dtypes.values))
@@ -203,6 +288,14 @@ def dtypes(func, *args, **kwargs):
 @wrapper
 @results
 def mprof(results, func, *args, **kwargs):
+    """Report and record the memory usage of each invocation of the
+    decorated function.
+
+    If the function returns a Pandas DataFrame, this object's memory
+    usage is reported, and subtracted from the recorded memory usage
+    (overhead) of the executed function.
+
+    """
     result = None
 
     def inner():
@@ -231,6 +324,10 @@ def mprof(results, func, *args, **kwargs):
 
 
 def sizecheck(func):
+    """Report the size of the DataFrame returned by the decorated
+    function.
+
+    """
     @functools.wraps(func)
     def wrapped(*args, **kwargs):
         df = func(*args, **kwargs)
@@ -243,6 +340,10 @@ def sizecheck(func):
 @wrapper
 @loadconfig
 def countcheck(config, func, *args, **kwargs):
+    """Report the row count of the profiling database table following
+    invocation of the decorated function.
+
+    """
     result = func(*args, **kwargs)
 
     (engine,) = (arg for arg in args if isinstance(arg, sqlalchemy.engine.Engine))  # FIXME?
@@ -254,6 +355,11 @@ def countcheck(config, func, *args, **kwargs):
 
 @contextmanager
 def loaddb():
+    """Context manager and decorator which creates a temporary
+    PostgreSQL database and provides the context or function an
+    associated SQLAlchemy database connection engine.
+
+    """
     with testing.postgresql.Postgresql() as postgresql:
         engine = sqlalchemy.create_engine(postgresql.url())
         try:
@@ -278,6 +384,10 @@ def column_type(column, default='varchar'):
 
 @loadconfig
 def create_table(config, header, engine):
+    """Create an empty database table according to configuration and the
+    input data header.
+
+    """
     (columns,) = csv.reader((header,))
     col_defn = ', '.join(f'{column} ' + column_type(column)
                          for column in columns)
@@ -288,6 +398,13 @@ def create_table(config, header, engine):
 @loaddb.manager
 @loadconfig.manager
 def loaddata(config, engine):
+    """Context manager and decorator which creates the configured
+    database table and populates it with input data.
+
+    An associated SQLAlchemy database connection engine is provided to
+    the context or function.
+
+    """
     with config.data_path.open() as fd:
         header = next(fd)
         create_table(header, engine)
@@ -305,11 +422,19 @@ def loaddata(config, engine):
 
 @loadconfig.manager
 def loadframe(config):
+    """Context manager and decorator providing a Pandas DataFrame
+    populated by the input data.
+
+    """
     yield pandas.read_csv(config.data_path, index_col='entity_id', parse_dates=True)
 
 
 @loadconfig.manager
 def loadquery(config):
+    """Context manager and decorator providing the SQL query by which
+    to retrieve all data from the database.
+
+    """
     yield f'select * from {config.table_name}'
 
 

@@ -1,24 +1,62 @@
+import abc
 import contextlib
 import functools
 
 
-# contextlib improvements #
+class Wrapper(abc.ABC):
+    """Functional wrapping via class definition and instantiation.
 
-class Wrapper:
+    Provides ``repr`` which indicates the wrapping chain.
 
+    """
     def __init__(self, func):
         functools.update_wrapper(self, func)
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.__wrapped__})"
 
+    @abc.abstractmethod
+    def __call__(self, *args, **kwargs):
+        return self.__wrapped__(*args, **kwargs)
+
 
 def wrapper(func):
+    """Define the decorated function as a function ``Wrapper``, which
+    decorates other functions, and receives an argument reference to the
+    decorated function upon invocation.
+
+    In place of::
+
+        def assert_result(func):
+            @functools.wraps(func)
+            def wrapped(*args, **kwargs):
+                result = func(*args, **kwargs)
+                assert result
+                return result
+
+            return wrapped
+
+    We might instead::
+
+        @wrapper
+        def assert_result(func, *args, **kwargs):
+            result = func(*args, **kwargs)
+            assert result
+            return result
+
+    Functions decorated by ``wrapper`` are subclasses of ``Wrapper``.
+
+    """
     def call(self, *args, **kwargs):
         return func(self.__wrapped__, *args, **kwargs)
 
-    return type(func.__name__, (Wrapper,), {'__call__': call})
+    return type(func.__name__, (Wrapper,), {
+        '__call__': call,
+        '__module__': func.__module__,
+    })
 
+
+# contextlib improvements #
 
 class _SharingMixin:
 
@@ -85,7 +123,14 @@ class _ComposingMixin:
 
 
 class SharingContextDecorator(_SharingMixin, _ComposingMixin, contextlib.ContextDecorator):
-    pass
+    """ContextDecorator which shares its context with the decorated
+    function and permits extension via decorator method ``manager``.
+
+    Like ``contextmanager``, but does not wrap simple generators;
+    declaration of the context manager interface -- ``__enter__`` and
+    ``__exit__`` -- is required.
+
+    """
 
 
 # better contextmanager
@@ -98,6 +143,19 @@ class _SharingGeneratorContextManager(_SharingMixin, contextlib._GeneratorContex
 
 class contextmanager(_ComposingMixin, Wrapper):
     """@contextmanager decorator.
+
+    Unlike the built-in provided by ``contextlib``:
+
+    1. Context values provided by manager generators are provided to
+       decorated functions upon invocation.
+
+    2. Context decorators which require no decoration arguments may be
+       used as decorators without superfluous invocation (empty
+       parentheses).
+
+    3. Context managers may be composed, such that the decorated
+       generator extends the decorating manager, (and receives its
+       context).
 
     Typical usage:
 
@@ -123,6 +181,30 @@ class contextmanager(_ComposingMixin, Wrapper):
         finally:
             <cleanup>
 
+    Moreover, (1) and (2):
+
+        @some_generator
+        def my_func(value):
+            ...
+
+    ``my_func`` may be invoked without arguments. The ``some_generator``
+    context will be recreated each time, and its value(s) provided to
+    the function, (seamlessly).
+
+    Nested contexts may also be recreated through decoration (3):
+
+        @some_generator.manager
+        def another_generator(value):
+            <setup>
+            try:
+                yield <value1>
+            finally:
+                <cleanup>
+
+        @another_generator
+        def my_func1(value1):
+            ...
+
     """
     def _get_cm(self):
         return self()
@@ -132,4 +214,5 @@ class contextmanager(_ComposingMixin, Wrapper):
         # invocation of the decorator
         if not kwds and len(args) == 1 and callable(args[0]):
             return _SharingGeneratorContextManager(self.__wrapped__, (), kwds)(args[0])
+
         return _SharingGeneratorContextManager(self.__wrapped__, args, kwds)
