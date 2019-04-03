@@ -8,6 +8,8 @@ class Management(LocalRoot):
 
     package_name = 'ohio'
 
+    bump_default_message = "Bump version: {current_version} → {new_version}"
+
     @local('remainder', metavar='additional arguments', nargs=REMAINDER)
     def test(self, args):
         """test the codebase"""
@@ -31,11 +33,22 @@ class Management(LocalRoot):
         except self.local.ProcessExecutionError as exc:
             raise SystemExit(exc.retcode)
 
-    @local('part', choices=('major', 'minor', 'patch'),
-           help="part of the version to be bumped")
+    @localmethod('part', choices=('major', 'minor', 'patch'),
+                 help="part of the version to be bumped")
+    @localmethod('-t', '--tag-message',
+                 help=f"Tag message (in addition to default: "
+                      f"'{bump_default_message}')")
     def bump(self, args):
         """increment package version"""
-        return self.local['bumpversion'][args.part]
+        if args.tag_message:
+            tag_message = f"{self.bump_default_message}\n\n{args.tag_message}"
+        else:
+            tag_message = self.bump_default_message
+
+        return self.local['bumpversion'][
+            '--tag-message', tag_message,
+            args.part,
+        ]
 
     @local
     def build(self):
