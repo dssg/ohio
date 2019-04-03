@@ -200,7 +200,7 @@ def static_accessor_data_frame_pg_copy_from(*args, **kwargs):
 
     if len(args) == 1 and isinstance(args[0], pandas.DataFrame):
         # accessed from instance
-        raise TypeError("'pg_copy_from' constructs objects of type 'DataFrame': "
-                        "df = DataFrame.pg_copy_from(...)")
+        raise AttributeError("'pg_copy_from' constructs objects of type "
+                             "'DataFrame': df = DataFrame.pg_copy_from(...)")
 
     return data_frame_pg_copy_from(*args, **kwargs)
