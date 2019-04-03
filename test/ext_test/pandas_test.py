@@ -12,6 +12,13 @@ import ohio.ext.pandas  # noqa
 
 class TestPandasExt:
 
+    names = ('Alice', 'Bob', 'Conner', 'Denise')
+
+    @staticmethod
+    def table_exists(table, engine):
+        result = engine.execute(f"select to_regclass('{table}')").scalar()
+        return bool(result)
+
     @pytest.fixture
     def engine(self):
         with testing.postgresql.Postgresql() as postgresql:
@@ -19,23 +26,36 @@ class TestPandasExt:
             yield engine
             engine.dispose()
 
-    @staticmethod
-    def table_exists(table, engine):
-        result = engine.execute(f"select to_regclass('{table}')").scalar()
-        return bool(result)
+    @pytest.fixture(name='df')
+    def names_df(self):
+        return pandas.DataFrame({'name': self.names})
 
-    def test_pg_copy_to(self, engine):
+    @pytest.mark.parametrize('method', ('pg_copy_to', 'pg_copy_from'))
+    def test_dataframe_class_access(self, method):
+        "pg_copy_* available on DataFrame constructor"
+        assert hasattr(pandas.DataFrame, method)
+
+    def test_dataframe_object_access(self, df):
+        "only pg_copy_to available on DataFrame instance"
+        assert hasattr(df, 'pg_copy_to')
+        assert not hasattr(df, 'pg_copy_from')
+
+    def test_dataframe_object_dir(self, df):
+        "DataFrame instance __dir__ works and only includes pg_copy_to"
+        members = dir(df)
+        assert 'pg_copy_to' in members
+        assert 'pg_copy_from' not in members
+
+    def test_pg_copy_to(self, engine, df):
         assert not self.table_exists('users', engine)
 
-        names = ['Alice', 'Bob', 'Conner', 'Denise']
-        df = pandas.DataFrame({'name': names})
         df.pg_copy_to('users', engine)
 
         assert self.table_exists('users', engine)
 
         results = engine.execute("select * from users")
         assert results.keys() == ['index', 'name']
-        assert results.fetchall() == list(enumerate(names))
+        assert results.fetchall() == list(enumerate(self.names))
 
     def test_pg_copy_from(self, engine):
         users = (
