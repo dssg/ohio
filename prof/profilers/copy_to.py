@@ -174,6 +174,30 @@ def ohio_pg_copy_to_100(config, df, engine):
 @countcheck
 @mprof
 @time
+def ohio_pg_copy_to_100_10(config, df, engine):
+    """pg_copy_to(buffer_size=100, iter_size=10) {DataFrame → PipeTextIO → COPY}"""
+    df.pg_copy_to(config.table_name, engine, buffer_size=100, iter_size=10)
+
+
+@profiler
+@loaddb
+@loadframe
+@loadconfig
+@countcheck
+@mprof
+@time
+def ohio_pg_copy_to_100_10000(config, df, engine):
+    """pg_copy_to(buffer_size=100, iter_size=10_000) {DataFrame → PipeTextIO → COPY}"""
+    df.pg_copy_to(config.table_name, engine, buffer_size=100, iter_size=10_000)
+
+
+@profiler
+@loaddb
+@loadframe
+@loadconfig
+@countcheck
+@mprof
+@time
 def ohio_pg_copy_to_1000(config, df, engine):
     """pg_copy_to(buffer_size=1000) {DataFrame → PipeTextIO → COPY}"""
     df.pg_copy_to(config.table_name, engine, buffer_size=1000)
