@@ -13,7 +13,7 @@ import sqlalchemy
 import testing.postgresql
 from memory_profiler import memory_usage
 
-from .util import contextmanager, histogram, SharingContextDecorator, wrapper
+from .util import contextmanager, SharingContextDecorator, wrapper
 
 
 class ConfigWrapper(SharingContextDecorator):
@@ -194,7 +194,7 @@ def time(results, func, *args, **kwargs):
 def dtypes(func, *args, **kwargs):
     result = func(*args, **kwargs)
 
-    dtypes = histogram(map(str, result.dtypes.values))
+    dtypes = collections.Counter(map(str, result.dtypes.values))
     report('dtypes result:', dict(dtypes))
 
     return result

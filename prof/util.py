@@ -1,13 +1,5 @@
-import collections
 import contextlib
 import functools
-
-
-def histogram(stream):
-    counts = collections.defaultdict(int)
-    for item in stream:
-        counts[item] += 1
-    return counts
 
 
 # contextlib improvements #
