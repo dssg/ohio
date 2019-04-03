@@ -13,7 +13,7 @@ import sqlalchemy
 import testing.postgresql
 from memory_profiler import memory_usage
 
-from .util import contextmanager, histogram, SharingContextDecorator, Wrapper
+from .util import contextmanager, histogram, SharingContextDecorator, wrapper
 
 
 class ConfigWrapper(SharingContextDecorator):
@@ -177,60 +177,57 @@ def free():
 #     finally:
 #         report('time (s):', round(timeit.default_timer() - start, 2))
 
-class time(Wrapper):
+@wrapper
+@results
+def time(results, func, *args, **kwargs):
+    start = timeit.default_timer()
+    result = func(*args, **kwargs)
+    duration = round(timeit.default_timer() - start, 2)
 
-    @results
-    def __call__(self, results, *args, **kwargs):
-        start = timeit.default_timer()
-        result = self.__wrapped__(*args, **kwargs)
-        duration = round(timeit.default_timer() - start, 2)
+    report('time (s):', duration)
+    results.save(func, time=duration)
 
-        report('time (s):', duration)
-        results.save(self.__wrapped__, time=duration)
-
-        return result
-
-
-class dtypes(Wrapper):
-
-    def __call__(self, *args, **kwargs):
-        result = self.__wrapped__(*args, **kwargs)
-
-        dtypes = histogram(map(str, result.dtypes.values))
-        report('dtypes result:', dict(dtypes))
-
-        return result
+    return result
 
 
-class mprof(Wrapper):
+@wrapper
+def dtypes(func, *args, **kwargs):
+    result = func(*args, **kwargs)
 
-    @results
-    def __call__(self, results, *args, **kwargs):
-        result = None
+    dtypes = histogram(map(str, result.dtypes.values))
+    report('dtypes result:', dict(dtypes))
 
-        def inner():
-            nonlocal result
-            result = self.__wrapped__(*args, **kwargs)
+    return result
 
-        mem_stats = memory_usage((inner,))
 
-        mem0 = math.ceil(mem_stats[0])
-        mem1 = math.ceil(max(mem_stats))
-        mem_added = mem1 - mem0
-        report('memory used (mb):', mem0, '→', mem1, f'({mem_added} added)')
+@wrapper
+@results
+def mprof(results, func, *args, **kwargs):
+    result = None
 
-        if isinstance(result, pandas.DataFrame):
-            mem_result = result.memory_usage(index=True, deep=True).sum() / 1024 / 1024
-            report('memory result (mb):', math.ceil(mem_result))
-        else:
-            mem_result = 0
+    def inner():
+        nonlocal result
+        result = func(*args, **kwargs)
 
-        mem_overhead = math.ceil(mem1 - mem_result)
-        report('memory overhead (mb):', mem_overhead)
+    mem_stats = memory_usage((inner,))
 
-        results.save(self.__wrapped__, memory=mem_overhead)
+    mem0 = math.ceil(mem_stats[0])
+    mem1 = math.ceil(max(mem_stats))
+    mem_added = mem1 - mem0
+    report('memory used (mb):', mem0, '→', mem1, f'({mem_added} added)')
 
-        return result
+    if isinstance(result, pandas.DataFrame):
+        mem_result = result.memory_usage(index=True, deep=True).sum() / 1024 / 1024
+        report('memory result (mb):', math.ceil(mem_result))
+    else:
+        mem_result = 0
+
+    mem_overhead = math.ceil(mem1 - mem_result)
+    report('memory overhead (mb):', mem_overhead)
+
+    results.save(func, memory=mem_overhead)
+
+    return result
 
 
 def sizecheck(func):
@@ -243,17 +240,16 @@ def sizecheck(func):
     return wrapped
 
 
-class countcheck(Wrapper):
+@wrapper
+@loadconfig
+def countcheck(config, func, *args, **kwargs):
+    result = func(*args, **kwargs)
 
-    @loadconfig
-    def __call__(self, config, *args, **kwargs):
-        result = self.__wrapped__(*args, **kwargs)
+    (engine,) = (arg for arg in args if isinstance(arg, sqlalchemy.engine.Engine))  # FIXME?
+    count = engine.execute(f'select count(1) from {config.table_name}').scalar()
+    report('count table (rows):', count)
 
-        (engine,) = (arg for arg in args if isinstance(arg, sqlalchemy.engine.Engine))  # FIXME?
-        count = engine.execute(f'select count(1) from {config.table_name}').scalar()
-        report('count table (rows):', count)
-
-        return result
+    return result
 
 
 @contextmanager

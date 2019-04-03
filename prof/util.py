@@ -21,6 +21,13 @@ class Wrapper:
         return f"{self.__class__.__name__}({self.__wrapped__})"
 
 
+def wrapper(func):
+    def call(self, *args, **kwargs):
+        return func(self.__wrapped__, *args, **kwargs)
+
+    return type(func.__name__, (Wrapper,), {'__call__': call})
+
+
 class _SharingMixin:
 
     class ContextWrapped(Wrapper):
