@@ -12,18 +12,18 @@ class IOClosed(ValueError):
         super().__init__(*args)
 
 
-class StreamTextIOBase(io.TextIOBase):
+class StreamIOBase(object):
     """Readable file-like abstract base class.
 
     Concrete classes may implemented method `__next_chunk__` to return
     chunks (or all) of the text to be read.
 
     """
-    def __init__(self):
-        self._remainder = ''
-
     def __next_chunk__(self):
-        raise NotImplementedError("StreamTextIOBase subclasses must implement __next_chunk__")
+        raise NotImplementedError("StreamIOBase subclasses must implement __next_chunk__")
+
+    def _get_empty_value(self):
+        raise NotImplementedError("StreamIOBase subclasses must implement _get_empty_value")
 
     def readable(self):
         if self.closed:
@@ -50,7 +50,7 @@ class StreamTextIOBase(io.TextIOBase):
         if size is not None and size < 0:
             size = None
 
-        result = ''
+        result = self._get_empty_value()
 
         while size is None or size > 0:
             content = self._read1(size)
@@ -68,10 +68,11 @@ class StreamTextIOBase(io.TextIOBase):
         if self.closed:
             raise IOClosed()
 
-        result = ''
+        result = self._get_empty_value()
+        newline = self._get_newline()
 
         while True:
-            index = self._remainder.find('\n')
+            index = self._remainder.find(newline)
             if index == -1:
                 result += self._remainder
                 try:
@@ -85,3 +86,41 @@ class StreamTextIOBase(io.TextIOBase):
                 break
 
         return result
+
+
+class StreamTextIOBase(StreamIOBase, io.TextIOBase):
+    """Readable file-like abstract base class for text.
+
+    Concrete classes may implemented method `__next_chunk__` to return
+    chunks (or all) of the text to be read.
+
+    """
+
+    def __init__(self):
+        self._remainder = ''
+
+    @staticmethod
+    def _get_empty_value():
+        return ''
+
+    @staticmethod
+    def _get_newline():
+        return '\n'
+
+
+class StreamBufferedIOBase(StreamIOBase, io.BufferedIOBase):
+    """Readable file-like abstract base class for bytes.
+
+    Concrete classes may implemented method `__next_chunk__` to return
+    chunks (or all) of the bytes to be read.
+    """
+    def __init__(self):
+        self._remainder = b''
+
+    @staticmethod
+    def _get_empty_value():
+        return b''
+
+    @staticmethod
+    def _get_newline():
+        return b'\n'

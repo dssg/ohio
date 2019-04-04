@@ -1,6 +1,6 @@
 """I/O extras"""
-from .baseio import (IOClosed, StreamTextIOBase)
-from .iterio import IteratorTextIO
+from .baseio import (IOClosed, StreamTextIOBase, StreamBufferedIOBase)
+from .iterio import IteratorTextIO, IteratorBufferedIO
 from .csvio import (csv_text, CsvWriterTextIO, CsvDictWriterTextIO)
 from .pipeio import PipeTextIO, pipe_text
 

@@ -23,3 +23,8 @@ def ex_csv_stream():
     yield '1/4/09 20:11,Product1,1200,Mastercard,Fleur\r\n'
     yield '1/2/09 20:09,Product1,1200,Mastercard,adam\r\n'
     yield '1/4/09 13:17,Product1,1200,Mastercard,Renee Elisabeth\r\n'
+
+
+def ex_csv_bytestream():
+    for csvline in ex_csv_stream():
+        yield csvline.encode('utf-8')
