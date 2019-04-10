@@ -1,6 +1,13 @@
+import pathlib
+import tempfile
+
+import plumbum
 from argparse import REMAINDER
 
 from argcmdr import LocalRoot, local, localmethod
+
+
+ROOT_DIR = pathlib.Path(__file__).parent.absolute()
 
 
 class Management(LocalRoot):
@@ -32,6 +39,72 @@ class Management(LocalRoot):
             yield (self.local.FG, self.local['python']['-m', 'prof'][remainder])
         except self.local.ProcessExecutionError as exc:
             raise SystemExit(exc.retcode)
+
+    @local('target', nargs='?', default='html',
+           help="output format for main docs (default: html)")
+    def docs(context, args):
+        """build documentation & readme"""
+        docs_path = ROOT_DIR / 'doc'
+
+        # build "big" docs
+        yield (
+            context.local.FG,
+            context.local['make'][
+                '-C', docs_path,
+                args.target,
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            # build readme
+            yield (
+                context.local.FG,
+                context.local['sphinx-build'][
+                    '-a',  # "all": write whether "changed" or not
+                    '-b', 'rst',
+                    # custom tag to disable links to index page(s)
+                    # (it's meant to be a single HTML page after all)
+                    '-t', 'noindex',
+                    docs_path,
+                    tmpdirname,
+                ]
+            )
+
+            # move readme into place
+            # (omitting build artifacts)
+            #
+            # with `make`, content is put under the subdirectory "singlehtml/";
+            # but, we're currently going through `sphinx-build`, which does not.
+            #
+            # build_path = pathlib.Path(tmpdirname) / 'singlehtml'
+            #
+            build_path = tmpdirname
+            readme_path = ROOT_DIR / 'README.rst'
+
+            with plumbum.local.cwd(build_path):
+                # no "_images" nor "_static" for rst
+                #
+                # yield context.local['cp'][
+                #     '-r',
+                #     '-t', docs_path,
+                #     '_images',
+                #     '_static',
+                # ]
+
+                yield context.local['cp']['index.rst', readme_path]
+
+        main_docs_path = docs_path / '_build' / args.target
+
+        try:
+            main_docs_shortpath = main_docs_path.relative_to(pathlib.Path.cwd())
+            readme_shortpath = readme_path.relative_to(pathlib.Path.cwd())
+        except ValueError:
+            main_docs_shortpath = main_docs_path
+            readme_shortpath = readme_path
+
+        print()
+        print("docs:", main_docs_shortpath)
+        print("readme:", readme_shortpath)
 
     @localmethod('part', choices=('major', 'minor', 'patch'),
                  help="part of the version to be bumped")

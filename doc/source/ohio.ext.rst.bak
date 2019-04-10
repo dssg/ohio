@@ -1,0 +1,19 @@
+ohio.ext package
+================
+
+.. automodule:: ohio.ext
+
+
+Submodules
+----------
+
+ohio.ext.pandas module
+----------------------
+
+.. automodule:: ohio.ext.pandas
+
+    .. autoclass:: ohio.ext.pandas.DataFramePgCopyTo
+
+    .. autofunction:: ohio.ext.pandas.to_sql_method_pg_copy_to
+
+    .. autofunction:: ohio.ext.pandas.data_frame_pg_copy_from
