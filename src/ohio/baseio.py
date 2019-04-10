@@ -1,8 +1,18 @@
+"""
+baseio
+------
+
+Low-level primitives.
+
+"""
 import io
 
 
 class IOClosed(ValueError):
+    """Exception indicating an attempted operation on a file-like
+    object which has been closed.
 
+    """
     _default_message_ = "I/O operation on closed file"
 
     def __init__(self, *args):
@@ -15,8 +25,8 @@ class IOClosed(ValueError):
 class StreamTextIOBase(io.TextIOBase):
     """Readable file-like abstract base class.
 
-    Concrete classes may implemented method `__next_chunk__` to return
-    chunks (or all) of the text to be read.
+    Concrete classes must implement method ``__next_chunk__`` to return
+    chunk(s) of the text to be read.
 
     """
     def __init__(self):

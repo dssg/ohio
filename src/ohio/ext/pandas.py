@@ -1,4 +1,9 @@
-"""ohio extensions for pandas
+"""
+Extensions for pandas
+---------------------
+
+This module extends ``pandas.DataFrame`` with methods ``pg_copy_to`` and
+``pg_copy_from``.
 
 To enable, simply import this module anywhere in your project,
 (most likely -- just once, in its root module)::
@@ -16,7 +21,7 @@ package::
 then in its ``__init__.py``, to ensure that extensions are loaded before
 your code, which uses them, is run.
 
-NOTE: These extensions are intended for Pandas, and attempt to
+**NOTE**: These extensions are intended for Pandas, and attempt to
 ``import pandas``. Pandas must be available (installed) in your
 environment.
 
@@ -29,9 +34,13 @@ import ohio
 import pandas
 
 
+BUFFER_SIZE = 100
+
+
 @pandas.api.extensions.register_dataframe_accessor('pg_copy_to')
 class DataFramePgCopyTo:
-    """Copy ``DataFrame`` to database table via PostgreSQL ``COPY``.
+    """``pg_copy_to``: Copy ``DataFrame`` to database table via
+    PostgreSQL ``COPY``.
 
     ``ohio.PipeTextIO`` enables the direct, in-process "piping" of
     ``DataFrame`` CSV into the "standard input" of the PostgreSQL
@@ -46,7 +55,7 @@ class DataFramePgCopyTo:
 
         >>> df = pandas.DataFrame({'name' : ['User 1', 'User 2', 'User 3']})
 
-    We may simply invoke the ``DataFrame``'s ohio extension method,
+    We may simply invoke the ``DataFrame``'s Ohio extension method,
     ``pg_copy_to``::
 
         >>> df.pg_copy_to('users', engine)
@@ -67,7 +76,7 @@ class DataFramePgCopyTo:
         self.data_frame = data_frame
 
     @functools.wraps(pandas.DataFrame.to_sql)
-    def __call__(self, *args, buffer_size=100, **kwargs):
+    def __call__(self, *args, buffer_size=BUFFER_SIZE, **kwargs):
         to_sql_method = functools.partial(to_sql_method_pg_copy_to,
                                           buffer_size=buffer_size)
         self.data_frame.to_sql(
@@ -94,7 +103,14 @@ def _write_csv(buffer, rows):
     writer.writerows(rows)
 
 
-def to_sql_method_pg_copy_to(table, conn, keys, data_iter, buffer_size):
+def to_sql_method_pg_copy_to(table, conn, keys, data_iter, buffer_size=BUFFER_SIZE):
+    """Write pandas data to table via stream through PostgreSQL
+    ``COPY``.
+
+    This implements a pandas `to_sql` "method", with the added optional
+    argument ``buffer_size``.
+
+    """
     columns = ', '.join('"{}"'.format(key) for key in keys)
     if table.schema:
         table_name = '{}.{}'.format(table.schema, table.name)
@@ -117,9 +133,9 @@ def to_sql_method_pg_copy_to(table, conn, keys, data_iter, buffer_size):
 def data_frame_pg_copy_from(sql, engine,
                             index_col=None, parse_dates=False, columns=None,
                             dtype=None, nrows=None,
-                            buffer_size=100):
-    """Construct ``DataFrame`` from database table or query via
-    PostgreSQL ``COPY``.
+                            buffer_size=BUFFER_SIZE):
+    """``pg_copy_from``: Construct ``DataFrame`` from database table or
+    query via PostgreSQL ``COPY``.
 
     ``ohio.PipeTextIO`` enables the direct, in-process "piping" of
     the PostgreSQL ``COPY`` command into Pandas ``read_csv``, for quick,
@@ -131,7 +147,7 @@ def data_frame_pg_copy_from(sql, engine,
         >>> from sqlalchemy import create_engine
         >>> engine = create_engine('sqlite://', echo=False)
 
-    We may simply invoke the ``DataFrame``'s ohio extension method,
+    We may simply invoke the ``DataFrame``'s Ohio extension method,
     ``pg_copy_from``::
 
         >>> df = DataFrame.pg_copy_from('users', engine)
