@@ -8,7 +8,7 @@ PYTEST_RUNNER = ['pytest-runner'] if NEEDS_PYTEST else []
 
 ROOT_PATH = Path(__file__).parent
 
-README_PATH = ROOT_PATH / 'README.md'
+README_PATH = ROOT_PATH / 'README.rst'
 
 REQUIREMENTS_TEST_PATH = ROOT_PATH / 'requirement' / 'test.txt'
 
@@ -34,7 +34,7 @@ setup(
     version='0.2.0',
     description="I/O extras",
     long_description=README_PATH.read_text(),
-    long_description_content_type='text/markdown',
+    long_description_content_type='text/x-rst',
     author="Center for Data Science and Public Policy",
     author_email='datascifellows@gmail.com',
     classifiers=[

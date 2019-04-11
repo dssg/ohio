@@ -1,3 +1,19 @@
+"""
+pipeio
+------
+
+Efficiently connect ``read()`` and ``write()`` interfaces.
+
+``PipeTextIO`` provides a *readable* and iterable interface to text
+whose producer requires a *writable* interface.
+
+In contrast to first writing such text to memory and then consuming it,
+``PipeTextIO`` only allows write operations as necessary to fill its
+buffer, to fulfill read operations, asynchronously. As such,
+``PipeTextIO`` consumes a stable minimum of memory, and may
+significantly boost speed, with a minimum of boilerplate.
+
+"""
 import queue
 import threading
 
@@ -5,7 +21,7 @@ from . import baseio
 
 
 class PipeTextIO(baseio.StreamTextIOBase):
-    """Iteratively stream output written by given function through
+    r"""Iteratively stream output written by given function through
     readable file-like interface.
 
     Uses in-process writer thread, (which runs the given function), to
@@ -18,8 +34,9 @@ class PipeTextIO(baseio.StreamTextIOBase):
     writing function can most likely be designed as a generator, (or as
     some sort of iterator). Its output can then, far more simply and
     easily, be streamed to some input. If your input must be ``read``
-    from a file-like object, see ``IteratorTextIO``. If your output must
-    be CSV-encoded, see ``csv_text`` and ``CsvWriterTextIO``.
+    from a file-like object, see ``ohio.IteratorTextIO``. If your output
+    must be CSV-encoded, see ``ohio.csv_text`` and
+    ``ohio.CsvWriterTextIO``.
 
     ``PipeTextIO`` is suitable for situations where output *must* be
     written to a file-like object, which is made blocking to enforce
@@ -48,7 +65,7 @@ class PipeTextIO(baseio.StreamTextIOBase):
     And, this is recommended. However, for the sake of example,
     consider the following::
 
-        >>> pipe = PipeTextIO(write_output)
+        >>> pipe = PipeTextIO(write_output, buffer_size=1)
 
         >>> pipe.read(5)
         [writer] Yay I wrote one line
@@ -73,22 +90,27 @@ class PipeTextIO(baseio.StreamTextIOBase):
     written to the file system, we are enabled to read it directly, in
     chunks.
 
-        0.  Initially, nothing is written.
-        1a. Upon requesting to read -- in this case, only the first 5
-            bytes -- the writer is initialized, and permitted to write
-            its first chunk, (which happens to be one full line). This is
-            retrieved from the write buffer, and sufficient to satisfy
-            the read request.
-        1b. Having removed the first chunk from the write buffer, the
-            writer is permitted to eagerly write its next chunk, (the
-            second line), (but, no more than that).
-        2.  The second read request -- for the remainder of the line --
+        1.  Initially, nothing is written.
+
+        2.  a) Upon requesting to read -- in this case, only the first 5
+               bytes -- the writer is initialized, and permitted to write
+               its first chunk, (which happens to be one full line). This is
+               retrieved from the write buffer, and sufficient to satisfy
+               the read request.
+
+            b) Having removed the first chunk from the write buffer, the
+               writer is permitted to eagerly write its next chunk, (the
+               second line), (but, no more than that).
+
+        3.  The second read request -- for the remainder of the line --
             is fully satisfied by the first chunk retrieved from the
             write buffer. No more writing takes place.
-        3.  The third read request, for another line, retrieves the
+
+        4.  The third read request, for another line, retrieves the
             second chunk from the write buffer. The writer is permitted
             to write its final chunk to the write buffer.
-        4.  The final read request returns all remaining text,
+
+        5.  The final read request returns all remaining text,
             (retrieved from the write buffer).
 
     Concretely, this is commonly useful with the PostgreSQL COPY
