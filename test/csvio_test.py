@@ -9,7 +9,7 @@ import ohio
 from . import ex_csv_stream, EXAMPLE_ROWS
 
 
-class TestCsvText:
+class TestEncodeCsv:
 
     def test_writer(self):
         # iterator NOT required; rather, test that iterator ALLOWED:
@@ -17,20 +17,22 @@ class TestCsvText:
         csv_content = ''.join(ex_csv_stream())
         assert ohio.encode_csv(csv_input) == csv_content
 
-    def test_dictwriter(self):
+    @pytest.mark.parametrize('write_header', (False, True))
+    def test_dictwriter(self, write_header):
         csv_input = iter(EXAMPLE_ROWS)
         field_names = next(csv_input)
         dict_input = (dict(zip(field_names, row)) for row in csv_input)
 
         csv_stream = ex_csv_stream()
-        # note: currently no handling for `writeheader` in this version
-        next(csv_stream)  # skip header
+        if not write_header:
+            next(csv_stream)  # skip header
         csv_content = ''.join(csv_stream)
 
         assert ohio.encode_csv(
             dict_input,
             fieldnames=field_names,
             writer=csv.DictWriter,
+            write_header=write_header,
         ) == csv_content
 
 

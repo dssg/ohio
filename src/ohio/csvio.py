@@ -11,7 +11,7 @@ import io
 from . import baseio
 
 
-def encode_csv(rows, *writer_args, writer=csv.writer, **writer_kwargs):
+def encode_csv(rows, *writer_args, writer=csv.writer, write_header=False, **writer_kwargs):
     r"""Encode the specified iterable of ``rows`` into CSV text.
 
     Data is encoded to an in-memory ``str``, (rather than to the file
@@ -52,13 +52,32 @@ def encode_csv(rows, *writer_args, writer=csv.writer, **writer_kwargs):
         ...      'Name': 'Betina'},
         ... ]
 
-        >>> encode_csv(data, writer=csv.DictWriter, fieldnames=header).splitlines(keepends=True)
+        >>> encoded_csv = encode_csv(data, writer=csv.DictWriter, fieldnames=header)
+
+        >>> encoded_csv.splitlines(keepends=True)
         ['1/2/09 6:17,Product1,1200,Mastercard,carolina\r\n',
+         '1/2/09 4:53,Product1,1200,Visa,Betina\r\n']
+
+    And, for such writers featuring the method ``writeheader``, you may
+    instruct ``encode_csv`` to invoke this, prior to writing ``rows``::
+
+        >>> encoded_csv = encode_csv(
+        ...     data,
+        ...     writer=csv.DictWriter,
+        ...     fieldnames=header,
+        ...     write_header=True,
+        ... )
+
+        >>> encoded_csv.splitlines(keepends=True)
+        ['Transaction_date,Product,Price,Payment_Type,Name\r\n',
+         '1/2/09 6:17,Product1,1200,Mastercard,carolina\r\n',
          '1/2/09 4:53,Product1,1200,Visa,Betina\r\n']
 
     """
     out = io.StringIO()
     csv_writer = writer(out, *writer_args, **writer_kwargs)
+    if write_header:
+        csv_writer.writeheader()
     csv_writer.writerows(rows)
     return out.getvalue()
 
