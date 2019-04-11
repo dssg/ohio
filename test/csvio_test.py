@@ -15,7 +15,7 @@ class TestCsvText:
         # iterator NOT required; rather, test that iterator ALLOWED:
         csv_input = iter(EXAMPLE_ROWS)
         csv_content = ''.join(ex_csv_stream())
-        assert ohio.csv_text(csv_input) == csv_content
+        assert ohio.encode_csv(csv_input) == csv_content
 
     def test_dictwriter(self):
         csv_input = iter(EXAMPLE_ROWS)
@@ -27,7 +27,7 @@ class TestCsvText:
         next(csv_stream)  # skip header
         csv_content = ''.join(csv_stream)
 
-        assert ohio.csv_text(
+        assert ohio.encode_csv(
             dict_input,
             fieldnames=field_names,
             writer=csv.DictWriter,

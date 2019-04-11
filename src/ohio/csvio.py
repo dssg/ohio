@@ -11,12 +11,12 @@ import io
 from . import baseio
 
 
-def csv_text(rows, *writer_args, writer=csv.writer, **writer_kwargs):
+def encode_csv(rows, *writer_args, writer=csv.writer, **writer_kwargs):
     r"""Encode the specified iterable of ``rows`` into CSV text.
 
     Data is encoded to an in-memory ``str``, (rather than to the file
     system), via an internally-managed ``io.StringIO``, (newly
-    constructed for every invocation of ``csv_text``).
+    constructed for every invocation of ``encode_csv``).
 
     For example::
 
@@ -25,7 +25,7 @@ def csv_text(rows, *writer_args, writer=csv.writer, **writer_kwargs):
         ...     ('1/2/09 4:53', 'Product1', '1200', 'Visa', 'Betina'),
         ... ]
 
-        >>> encoded_csv = csv_text(data)
+        >>> encoded_csv = encode_csv(data)
 
         >>> encoded_csv[:80]
         '1/2/09 6:17,Product1,1200,Mastercard,carolina\r\n1/2/09 4:53,Product1,1200,Visa,Be'
@@ -52,7 +52,7 @@ def csv_text(rows, *writer_args, writer=csv.writer, **writer_kwargs):
         ...      'Name': 'Betina'},
         ... ]
 
-        >>> csv_text(data, writer=csv.DictWriter, fieldnames=header).splitlines(keepends=True)
+        >>> encode_csv(data, writer=csv.DictWriter, fieldnames=header).splitlines(keepends=True)
         ['1/2/09 6:17,Product1,1200,Mastercard,carolina\r\n',
          '1/2/09 4:53,Product1,1200,Visa,Betina\r\n']
 
@@ -71,7 +71,7 @@ class CsvWriterTextIO(baseio.StreamTextIOBase):
 
     Rather than write to the file system, an internal ``io.StringIO``
     buffer is used to store output temporarily, until it is read.
-    (Unlike ``ohio.csv_text``, this buffer is reused across read/write
+    (Unlike ``ohio.encode_csv``, this buffer is reused across read/write
     cycles.)
 
     """

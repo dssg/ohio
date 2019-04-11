@@ -37,14 +37,14 @@ csvio
 
 Flexibly encode data to CSV format.
 
-**ohio.csv_text(rows, *writer_args, writer=<built-in function writer>,
-**writer_kwargs)**
+**ohio.encode_csv(rows, *writer_args, writer=<built-in function
+writer>, **writer_kwargs)**
 
    Encode the specified iterable of ``rows`` into CSV text.
 
    Data is encoded to an in-memory ``str``, (rather than to the file
    system), via an internally-managed ``io.StringIO``, (newly
-   constructed for every invocation of ``csv_text``).
+   constructed for every invocation of ``encode_csv``).
 
    For example:
 
@@ -55,7 +55,7 @@ Flexibly encode data to CSV format.
       ...     ('1/2/09 4:53', 'Product1', '1200', 'Visa', 'Betina'),
       ... ]
 
-      >>> encoded_csv = csv_text(data)
+      >>> encoded_csv = encode_csv(data)
 
       >>> encoded_csv[:80]
       '1/2/09 6:17,Product1,1200,Mastercard,carolina\r\n1/2/09 4:53,Product1,1200,Visa,Be'
@@ -85,7 +85,7 @@ Flexibly encode data to CSV format.
       ...      'Name': 'Betina'},
       ... ]
 
-      >>> csv_text(data, writer=csv.DictWriter, fieldnames=header).splitlines(keepends=True)
+      >>> encode_csv(data, writer=csv.DictWriter, fieldnames=header).splitlines(keepends=True)
       ['1/2/09 6:17,Product1,1200,Mastercard,carolina\r\n',
        '1/2/09 4:53,Product1,1200,Visa,Betina\r\n']
 
@@ -98,8 +98,8 @@ Flexibly encode data to CSV format.
 
    Rather than write to the file system, an internal ``io.StringIO``
    buffer is used to store output temporarily, until it is read.
-   (Unlike ``ohio.csv_text``, this buffer is reused across read/write
-   cycles.)
+   (Unlike ``ohio.encode_csv``, this buffer is reused across
+   read/write cycles.)
 
 **class ohio.CsvDictWriterTextIO(*writer_args, **writer_kwargs)**
 
@@ -180,7 +180,7 @@ significantly boost speed, with a minimum of boilerplate.
    some sort of iterator). Its output can then, far more simply and
    easily, be streamed to some input. If your input must be ``read``
    from a file-like object, see ``ohio.IteratorTextIO``. If your
-   output must be CSV-encoded, see ``ohio.csv_text`` and
+   output must be CSV-encoded, see ``ohio.encode_csv`` and
    ``ohio.CsvWriterTextIO``.
 
    ``PipeTextIO`` is suitable for situations where output *must* be
@@ -493,7 +493,7 @@ of 896,677 rows across 83 columns: 1 of these of type timestamp, 51
 integers and 31 floats. The benchmarking package, ``prof``, is
 preserved in `Ohio's repository <https://github.com/dssg/ohio>`_.
 
-.. image:: https://raw.githubusercontent.com/dssg/ohio/0.3.0/doc/img/profile-copy-from-database-to-datafram-1554345457.svg?sanitize=true
+.. image:: https://raw.githubusercontent.com/dssg/ohio/0.3.1/doc/img/profile-copy-from-database-to-datafram-1554345457.svg?sanitize=true
 
 ohio_pg_copy_from_X
    ``pg_copy_from(buffer_size=X)``
@@ -521,7 +521,7 @@ pandas_read_csv_stringio
    ``COPY`` to a ``StringIO``, from which pandas constructs a
    ``DataFrame``.
 
-.. image:: https://raw.githubusercontent.com/dssg/ohio/0.3.0/doc/img/profile-copy-from-dataframe-to-databas-1554320666.svg?sanitize=true
+.. image:: https://raw.githubusercontent.com/dssg/ohio/0.3.1/doc/img/profile-copy-from-dataframe-to-databas-1554320666.svg?sanitize=true
 
 ohio_pg_copy_to_X
    ``pg_copy_to(buffer_size=X)``
