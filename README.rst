@@ -493,7 +493,7 @@ of 896,677 rows across 83 columns: 1 of these of type timestamp, 51
 integers and 31 floats. The benchmarking package, ``prof``, is
 preserved in `Ohio's repository <https://github.com/dssg/ohio>`_.
 
-.. image:: https://raw.githubusercontent.com/dssg/ohio/docs/doc/img/profile-copy-from-database-to-datafram-1554345457.svg?sanitize=true
+.. image:: https://raw.githubusercontent.com/dssg/ohio/0.3.0/doc/img/profile-copy-from-database-to-datafram-1554345457.svg?sanitize=true
 
 ohio_pg_copy_from_X
    ``pg_copy_from(buffer_size=X)``
@@ -521,7 +521,7 @@ pandas_read_csv_stringio
    ``COPY`` to a ``StringIO``, from which pandas constructs a
    ``DataFrame``.
 
-.. image:: https://raw.githubusercontent.com/dssg/ohio/docs/doc/img/profile-copy-from-dataframe-to-databas-1554320666.svg?sanitize=true
+.. image:: https://raw.githubusercontent.com/dssg/ohio/0.3.0/doc/img/profile-copy-from-dataframe-to-databas-1554320666.svg?sanitize=true
 
 ohio_pg_copy_to_X
    ``pg_copy_to(buffer_size=X)``
