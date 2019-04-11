@@ -38,7 +38,7 @@ setup(
     author="Center for Data Science and Public Policy",
     author_email='datascifellows@gmail.com',
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Natural Language :: English',
         'Programming Language :: Python :: 3',
