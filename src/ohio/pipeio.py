@@ -35,7 +35,7 @@ class PipeTextIO(baseio.StreamTextIOBase):
     some sort of iterator). Its output can then, far more simply and
     easily, be streamed to some input. If your input must be ``read``
     from a file-like object, see ``ohio.IteratorTextIO``. If your output
-    must be CSV-encoded, see ``ohio.csv_text`` and
+    must be CSV-encoded, see ``ohio.encode_csv`` and
     ``ohio.CsvWriterTextIO``.
 
     ``PipeTextIO`` is suitable for situations where output *must* be

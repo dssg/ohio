@@ -13,7 +13,15 @@ Ohio
 
 .. automodule:: ohio.csvio
 
-.. autofunction:: ohio.csv_text
+.. autofunction:: ohio.encode_csv
+
+.. autoclass:: ohio.CsvTextIO
+
+.. autoclass:: ohio.CsvDictTextIO
+
+.. autofunction:: ohio.iter_csv
+
+.. autofunction:: ohio.iter_dict_csv
 
 .. autoclass:: ohio.CsvWriterTextIO
 
