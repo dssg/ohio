@@ -9,6 +9,7 @@ import re
 import matplotlib.pyplot as plt
 import numpy
 import pandas
+import yaml
 
 import ohio.ext.pandas  # noqa
 
@@ -140,7 +141,10 @@ def main(prog=None, argv=None):
     if args.plot and args.execute:
         for (tag, profilers) in tagged_profilers.items():
             tag_results = {
-                profiler.__name__: results.get(profiler)
+                # retrieve results for profilers under this tag
+                # (converting results defaultdict to dict --
+                # for safety and s.t. the data YAML is cleaner)
+                profiler.__name__: dict(results.get(profiler))
                 for profiler in profilers
             }
 
@@ -182,12 +186,20 @@ def main(prog=None, argv=None):
             tag_tag = f'-{tag_slug}' if tag_slug else ''
             date_suffix = int(start_datetime.timestamp())
 
-            plot_filename = f'{filename_base}{tag_tag}-{date_suffix}.svg'
+            base_filename = f'{filename_base}{tag_tag}-{date_suffix}'
+            plot_filename = f'{base_filename}.svg'
+            data_filename = f'{base_filename}.yaml'
 
             plt.savefig(plot_filename)
 
             print()
             print('[plot]', "saved:", plot_filename)
+
+            with open(data_filename, 'w') as data_fd:
+                yaml.dump(tag_results, data_fd)
+
+            print()
+            print('[data]', "saved:", data_filename)
 
 
 if __name__ == '__main__':

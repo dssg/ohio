@@ -7,6 +7,7 @@ Flexibly encode data to CSV format.
 """
 import csv
 import io
+import itertools
 
 from . import baseio
 
@@ -126,10 +127,11 @@ class CsvTextIO(baseio.StreamTextIOBase):
     """
     make_writer = csv.writer
 
-    def __init__(self, rows, *writer_args, write_header=False, **writer_kwargs):
+    def __init__(self, rows, *writer_args, write_header=False, chunk_size=10, **writer_kwargs):
         super().__init__()
         self.rows = iter(rows)
         self.must_writeheader = write_header
+        self.chunk_size = chunk_size
         self.outfile = io.StringIO()
         self.writer = self.make_writer(self.outfile, *writer_args, **writer_kwargs)
 
@@ -138,7 +140,14 @@ class CsvTextIO(baseio.StreamTextIOBase):
             self.writer.writeheader()
             self.must_writeheader = False
         else:
+            # split out writing of chunk's first row to ensure we raise
+            # StopIteration if chunk will be empty;
+            # (but having done so then allow chunk to simply be "short")
             self.writer.writerow(next(self.rows))
+
+        if self.chunk_size > 1:
+            row_remainder = itertools.islice(self.rows, (self.chunk_size - 1))
+            self.writer.writerows(row_remainder)
 
         text = self.outfile.getvalue()
 

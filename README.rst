@@ -109,7 +109,7 @@ writer>, write_header=False, **writer_kwargs)**
        '1/2/09 4:53,Product1,1200,Visa,Betina\r\n']
 
 **class ohio.CsvTextIO(rows, *writer_args, write_header=False,
-**writer_kwargs)**
+chunk_size=10, **writer_kwargs)**
 
    Readable file-like interface encoding specified data as CSV.
 
@@ -156,7 +156,7 @@ writer>, write_header=False, **writer_kwargs)**
    which was nothing.
 
 **class ohio.CsvDictTextIO(rows, *writer_args, write_header=False,
-**writer_kwargs)**
+chunk_size=10, **writer_kwargs)**
 
    ``CsvTextIO`` which accepts row data in the form of ``dict``.
 
@@ -568,10 +568,10 @@ environment.
    ``pg_copy_to``: Copy ``DataFrame`` to database table via PostgreSQL
    ``COPY``.
 
-   ``ohio.PipeTextIO`` enables the direct, in-process “piping” of
-   ``DataFrame`` CSV into the “standard input” of the PostgreSQL
-   ``COPY`` command, for quick, memory-efficient database persistence,
-   (and without the needless involvement of the local file system).
+   ``ohio.CsvTextIO`` enables the direct reading of ``DataFrame`` CSV
+   into the “standard input” of the PostgreSQL ``COPY`` command, for
+   quick, memory-efficient database persistence, (and without the
+   needless involvement of the local file system).
 
    For example, given a SQLAlchemy database connection engine and a
    Pandas ``DataFrame``:
@@ -593,21 +593,13 @@ environment.
    ``pg_copy_to`` supports all the same parameters as ``to_sql``,
    (excepting parameter ``method``).
 
-   In addition to the signature of ``to_sql``, ``pg_copy_to`` accepts
-   the optimization parameter ``buffer_size``, which controls the
-   maximum number of CSV-encoded write results to hold in memory prior
-   to their being read into the database. Depending on use-case,
-   increasing this value may speed up the operation, at the cost of
-   additional memory – and vice-versa. ``buffer_size`` defaults to
-   ``100``.
-
 **ohio.ext.pandas.to_sql_method_pg_copy_to(table, conn, keys,
-data_iter, buffer_size=100)**
+data_iter)**
 
    Write pandas data to table via stream through PostgreSQL ``COPY``.
 
-   This implements a pandas *to_sql* “method”, with the added optional
-   argument ``buffer_size``.
+   This implements a pandas ``to_sql`` “method”, utilizing
+   ``ohio.CsvTextIO`` for performance stability.
 
 **ohio.ext.pandas.data_frame_pg_copy_from(sql, engine, index_col=None,
 parse_dates=False, columns=None, dtype=None, nrows=None,
@@ -655,22 +647,20 @@ memory-efficiency relative both to pandas built-in functionality and
 to custom implementations which do not utilize Ohio.
 
 Interfaces and syntactical niceties aside, Ohio generally features
-memory stability. Its tools enable pipelines which *may* also improve
-speed.
+memory stability. Its tools enable pipelines which may also improve
+speed, (and which do so in standard use-cases).
 
 In the below benchmark, Ohio extensions ``pg_copy_from`` &
 ``pg_copy_to`` reduced memory consumption by 84% & 61%, and completed
-in 39% & 89% less time, relative to pandas built-ins ``read_sql`` &
+in 39% & 91% less time, relative to pandas built-ins ``read_sql`` &
 ``to_sql``, (respectively).
 
 Compared to purpose-built extensions – which utilized PostgreSQL
-``COPY``, but using ``io.StringIO`` in place of ``ohio.PipeTextIO`` –
-``pg_copy_from`` & ``pg_copy_to`` still reduced memory consumption by
-60% & 33%, respectively. ``pg_copy_from`` also completed in 16% less
-time than the ``io.StringIO`` version. ``pg_copy_to`` took on average
-7% more time to complete than the ``io.StringIO`` version. (Speed
-improvements – which do not diminish Ohio’s memory efficiency – have
-been identified as a target for future work.)
+``COPY``, but using ``io.StringIO`` in place of ``ohio.PipeTextIO``
+and ``ohio.CsvTextIO`` – ``pg_copy_from`` & ``pg_copy_to`` also
+reduced memory consumption by 60% & 32%, respectively.
+``pg_copy_from`` & ``pg_copy_to`` also completed in 16% & 13% less
+time than the ``io.StringIO`` versions.
 
 The benchmarks plotted below were produced from averages and standard
 deviations over 3 randomized trials per target. Input data consisted
@@ -706,22 +696,21 @@ pandas_read_csv_stringio
    ``COPY`` to a ``StringIO``, from which pandas constructs a
    ``DataFrame``.
 
-.. image:: https://raw.githubusercontent.com/dssg/ohio/0.3.1/doc/img/profile-copy-from-dataframe-to-databas-1554320666.svg?sanitize=true
+.. image:: https://raw.githubusercontent.com/dssg/ohio/0.3.1/doc/img/profile-copy-from-dataframe-to-databas-1555458507.svg?sanitize=true
 
-ohio_pg_copy_to_X
-   ``pg_copy_to(buffer_size=X)``
+ohio_pg_copy_to
+   ``pg_copy_to()``
 
-   ``DataFrame`` data are written and encoded through a
-   ``PipeTextIO``, and read by a PostgreSQL database-connected
-   cursor’s ``COPY`` command.
+   ``DataFrame`` data are encoded through a ``CsvTextIO``, and read by
+   a PostgreSQL database-connected cursor’s ``COPY`` command.
 
 pandas_to_sql
    ``pandas.DataFrame.to_sql()``
 
    Pandas inserts ``DataFrame`` data into the database row by row.
 
-pandas_to_sql_multi_X
-   ``pandas.DataFrame.to_sql(method='multi', chunksize=X)``
+pandas_to_sql_multi_100
+   ``pandas.DataFrame.to_sql(method='multi', chunksize=100)``
 
    Pandas inserts ``DataFrame`` data into the database in chunks of
    rows.
