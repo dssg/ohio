@@ -27,14 +27,10 @@ environment.
 
 """
 import contextlib
-import csv
 import functools
 
 import ohio
 import pandas
-
-
-BUFFER_SIZE = 100
 
 
 @pandas.api.extensions.register_dataframe_accessor('pg_copy_to')
@@ -42,10 +38,10 @@ class DataFramePgCopyTo:
     """``pg_copy_to``: Copy ``DataFrame`` to database table via
     PostgreSQL ``COPY``.
 
-    ``ohio.PipeTextIO`` enables the direct, in-process "piping" of
-    ``DataFrame`` CSV into the "standard input" of the PostgreSQL
-    ``COPY`` command, for quick, memory-efficient database persistence,
-    (and without the needless involvement of the local file system).
+    ``ohio.CsvTextIO`` enables the direct reading of ``DataFrame`` CSV
+    into the "standard input" of the PostgreSQL ``COPY`` command, for
+    quick, memory-efficient database persistence, (and without the
+    needless involvement of the local file system).
 
     For example, given a SQLAlchemy database connection engine and a
     Pandas ``DataFrame``::
@@ -63,52 +59,25 @@ class DataFramePgCopyTo:
     ``pg_copy_to`` supports all the same parameters as ``to_sql``,
     (excepting parameter ``method``).
 
-    In addition to the signature of ``to_sql``, ``pg_copy_to`` accepts
-    the optimization parameter ``buffer_size``, which controls the
-    maximum number of CSV-encoded write results to hold in memory prior
-    to their being read into the database. Depending on use-case,
-    increasing this value may speed up the operation, at the cost of
-    additional memory -- and vice-versa. ``buffer_size`` defaults to
-    ``100``.
-
     """
     def __init__(self, data_frame):
         self.data_frame = data_frame
 
     @functools.wraps(pandas.DataFrame.to_sql)
-    def __call__(self, *args, buffer_size=BUFFER_SIZE, **kwargs):
-        to_sql_method = functools.partial(to_sql_method_pg_copy_to,
-                                          buffer_size=buffer_size)
+    def __call__(self, *args, **kwargs):
         self.data_frame.to_sql(
             *args,
-            method=to_sql_method,
+            method=to_sql_method_pg_copy_to,
             **kwargs,
         )
 
-        # NOTE: this was previously implemented as follows;
-        # (but, this couldn't easily support all of to_sql's features):
-        #
-        # with ohio.pipe_text(self.data_frame.to_csv) as pipe, \
-        #         contextlib.closing(engine.raw_connection()) as conn:
-        #     cursor = conn.cursor()
-        #
-        #     cursor.copy_expert(
-        #         'COPY {name} FROM STDIN WITH CSV HEADER'.format(name=name),
-        #         pipe,
-        #     )
 
-
-def _write_csv(buffer, rows):
-    writer = csv.writer(buffer)
-    writer.writerows(rows)
-
-
-def to_sql_method_pg_copy_to(table, conn, keys, data_iter, buffer_size=BUFFER_SIZE):
+def to_sql_method_pg_copy_to(table, conn, keys, data_iter):
     """Write pandas data to table via stream through PostgreSQL
     ``COPY``.
 
-    This implements a pandas `to_sql` "method", with the added optional
-    argument ``buffer_size``.
+    This implements a pandas ``to_sql`` "method", utilizing
+    ``ohio.CsvTextIO`` for performance stability.
 
     """
     columns = ', '.join('"{}"'.format(key) for key in keys)
@@ -122,18 +91,15 @@ def to_sql_method_pg_copy_to(table, conn, keys, data_iter, buffer_size=BUFFER_SI
         columns=columns,
     )
 
-    # Note: this could use a csv stream rather than csv.writer
-    with ohio.pipe_text(_write_csv,
-                        data_iter,
-                        buffer_size=buffer_size) as pipe, \
+    with ohio.CsvTextIO(data_iter) as csv_buffer, \
             conn.connection.cursor() as cursor:
-        cursor.copy_expert(sql, pipe)
+        cursor.copy_expert(sql, csv_buffer)
 
 
 def data_frame_pg_copy_from(sql, engine,
                             index_col=None, parse_dates=False, columns=None,
                             dtype=None, nrows=None,
-                            buffer_size=BUFFER_SIZE):
+                            buffer_size=100):
     """``pg_copy_from``: Construct ``DataFrame`` from database table or
     query via PostgreSQL ``COPY``.
 
