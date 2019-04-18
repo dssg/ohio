@@ -1,7 +1,5 @@
 argcmdr==0.6.0
 bump2version==0.5.10
-https://github.com/dssg/restbuilder/archive/jsl.zip
-sphinx==2.0.0
 tox==3.7.0
 twine==1.13.0
 wheel==0.33.1

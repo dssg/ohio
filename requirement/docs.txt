@@ -1,0 +1,2 @@
+https://github.com/dssg/restbuilder/archive/jsl.zip
+sphinx==2.0.0
