@@ -49,6 +49,14 @@ Ohio
 
 .. automodule:: ohio.ext
 
+    .. automodule:: ohio.ext.numpy
+
+        .. autofunction:: ohio.ext.numpy.pg_copy_to_table
+
+        .. autofunction:: ohio.ext.numpy.pg_copy_from_table
+
+        .. autofunction:: ohio.ext.numpy.pg_copy_from_query
+
     .. automodule:: ohio.ext.pandas
 
         .. autoclass:: ohio.ext.pandas.DataFramePgCopyTo
