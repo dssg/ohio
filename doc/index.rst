@@ -11,6 +11,17 @@ Ohio
 .. contents::
 
 
+Installation
+============
+
+Ohio is a distributed library with support for Python v3. It is available from `pypi.org <https://pypi.org/project/ohio/>`_::
+
+    $ pip install ohio
+
+
+Modules
+=======
+
 .. automodule:: ohio.csvio
 
 .. autofunction:: ohio.encode_csv

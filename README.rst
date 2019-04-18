@@ -17,23 +17,42 @@ Contents
 
 * `Ohio`_
 
-   * `csvio`_
+   * `Installation`_
 
-   * `iterio`_
+   * `Modules`_
 
-   * `pipeio`_
+      * `csvio`_
 
-   * `baseio`_
+      * `iterio`_
 
-   * `Extensions`_
+      * `pipeio`_
 
-      * `Extensions for pandas`_
+      * `baseio`_
 
-      * `Benchmarking`_
+      * `Extensions`_
+
+         * `Extensions for pandas`_
+
+         * `Benchmarking`_
+
+
+Installation
+============
+
+Ohio is a distributed library with support for Python v3. It is
+available from `pypi.org <https://pypi.org/project/ohio/>`_:
+
+::
+
+   $ pip install ohio
+
+
+Modules
+=======
 
 
 csvio
-=====
+-----
 
 Flexibly encode data to CSV format.
 
@@ -296,7 +315,7 @@ chunk_size=10, **writer_kwargs)**
 
 
 iterio
-======
+------
 
 Provide a readable file-like interface to any iterable.
 
@@ -336,7 +355,7 @@ Provide a readable file-like interface to any iterable.
 
 
 pipeio
-======
+------
 
 Efficiently connect ``read()`` and ``write()`` interfaces.
 
@@ -508,7 +527,7 @@ significantly boost speed, with a minimum of boilerplate.
 
 
 baseio
-======
+------
 
 Low-level primitives.
 
@@ -528,13 +547,13 @@ Low-level primitives.
 
 
 Extensions
-==========
+----------
 
 Modules integrating Ohio with the toolsets that need it.
 
 
 Extensions for pandas
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 This module extends ``pandas.DataFrame`` with methods ``pg_copy_to``
 and ``pg_copy_from``.
@@ -640,7 +659,7 @@ buffer_size=100)**
 
 
 Benchmarking
-------------
+~~~~~~~~~~~~
 
 Ohio extensions for pandas were benchmarked to test their speed and
 memory-efficiency relative both to pandas built-in functionality and
