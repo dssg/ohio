@@ -53,7 +53,17 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 html_theme = 'alabaster'
 
 html_theme_options = {
-    'nosidebar': True,
+    'github_user': 'dssg',
+    'github_repo': 'ohio',
+    'github_button': True,
+}
+
+html_sidebars = {
+    '**': [
+        'about.html',
+        'relations.html',
+        'searchbox.html',
+    ]
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
