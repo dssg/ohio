@@ -1,4 +1,4 @@
-pandas==0.24.1
+-r ./include/ext.txt
 psycopg2-binary==2.7.7
 pytest==4.3.0
 signalled-timeout==1.0.0
