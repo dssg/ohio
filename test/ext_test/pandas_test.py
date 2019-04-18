@@ -8,7 +8,22 @@ import pytest
 import ohio.ext.pandas  # noqa
 
 
-class TestPandasExt:
+@pytest.fixture
+def engine():
+    with testing.postgresql.Postgresql() as postgresql:
+        engine = sqlalchemy.create_engine(postgresql.url())
+        yield engine
+        engine.dispose()
+
+
+def get_connectable(engine, use_conn):
+    return engine.connect() if use_conn else engine
+
+
+parametrize_connectable = pytest.mark.parametrize('use_conn', (True, False))
+
+
+class TestPandasExtPgCopyTo:
 
     names = ('Alice', 'Bob', 'Conner', 'Denise')
 
@@ -37,10 +52,11 @@ class TestPandasExt:
         assert 'pg_copy_to' in members
         assert 'pg_copy_from' not in members
 
-    def test_pg_copy_to(self, engine, df):
+    @parametrize_connectable
+    def test_pg_copy_to(self, engine, df, use_conn):
         assert not self.table_exists('users', engine)
 
-        df.pg_copy_to('users', engine)
+        df.pg_copy_to('users', get_connectable(engine, use_conn))
 
         assert self.table_exists('users', engine)
 
@@ -48,7 +64,11 @@ class TestPandasExt:
         assert results.keys() == ['index', 'name']
         assert results.fetchall() == list(enumerate(self.names))
 
-    def test_pg_copy_from(self, engine):
+
+class TestPandasExtPgCopyFrom:
+
+    @parametrize_connectable
+    def test_pg_copy_from(self, engine, use_conn):
         users = (
             ('Alice', datetime(2019, 1, 2, 13, 0, 0), 302.1),
             ('Bob', datetime(2018, 10, 20, 8, 7, 10), 2.4),
@@ -76,7 +96,7 @@ class TestPandasExt:
 
         df = pandas.DataFrame.pg_copy_from(
             'users',
-            engine,
+            get_connectable(engine, use_conn),
             index_col='id',
             parse_dates=['last_login'],
         )

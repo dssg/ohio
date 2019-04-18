@@ -26,7 +26,6 @@ your code, which uses them, is run.
 environment.
 
 """
-import contextlib
 import functools
 
 import ohio
@@ -43,8 +42,9 @@ class DataFramePgCopyTo:
     quick, memory-efficient database persistence, (and without the
     needless involvement of the local file system).
 
-    For example, given a SQLAlchemy database connection engine and a
-    Pandas ``DataFrame``::
+    For example, given a SQLAlchemy ``connectable`` – either a database
+    connection ``Engine`` or ``Connection`` – and a Pandas
+    ``DataFrame``::
 
         >>> from sqlalchemy import create_engine
         >>> engine = create_engine('postgresql://')
@@ -96,7 +96,7 @@ def to_sql_method_pg_copy_to(table, conn, keys, data_iter):
         cursor.copy_expert(sql, csv_buffer)
 
 
-def data_frame_pg_copy_from(sql, engine,
+def data_frame_pg_copy_from(sql, connectable,
                             index_col=None, parse_dates=False, columns=None,
                             dtype=None, nrows=None,
                             buffer_size=100):
@@ -108,7 +108,8 @@ def data_frame_pg_copy_from(sql, engine,
     memory-efficient construction of ``DataFrame`` from database, (and
     without the needless involvement of the local file system).
 
-    For example, given a SQLAlchemy database connection engine::
+    For example, given a SQLAlchemy ``connectable`` – either a database
+    connection ``Engine`` or ``Connection``::
 
         >>> from sqlalchemy import create_engine
         >>> engine = create_engine('postgresql://')
@@ -130,10 +131,7 @@ def data_frame_pg_copy_from(sql, engine,
     ``100``.
 
     """
-    if isinstance(engine, str):
-        raise TypeError("only SQLAlchemy engine supported not 'str'")
-
-    pandas_sql = pandas.io.sql.SQLDatabase(engine)
+    pandas_sql = pandas.io.sql.SQLDatabase(connectable)
 
     try:
         is_table_name = pandas_sql.has_table(sql)
@@ -154,8 +152,8 @@ def data_frame_pg_copy_from(sql, engine,
     else:
         source = "({})".format(sql)
 
-    with contextlib.closing(engine.raw_connection()) as conn:
-        cursor = conn.cursor()
+    with connectable.connect() as conn:
+        cursor = conn.connection.cursor()
 
         writer = functools.partial(
             cursor.copy_expert,
