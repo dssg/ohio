@@ -6,7 +6,7 @@ This module enables writing NumPy array data to database and populating
 arrays from database via PostgreSQL ``COPY``. The operation is ensured,
 by Ohio, to be memory-efficient.
 
-**NOTE**: This integration is intended for NumPy, and attempts to
+**Note**: This integration is intended for NumPy, and attempts to
 ``import numpy``. NumPy must be available (installed) in your
 environment.
 
