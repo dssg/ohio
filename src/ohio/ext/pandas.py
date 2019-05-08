@@ -1,5 +1,5 @@
 """
-Extensions for pandas
+Extensions for Pandas
 ---------------------
 
 This module extends ``pandas.DataFrame`` with methods ``pg_copy_to`` and
@@ -21,7 +21,7 @@ package::
 then in its ``__init__.py``, to ensure that extensions are loaded before
 your code, which uses them, is run.
 
-**NOTE**: These extensions are intended for Pandas, and attempt to
+**Note**: These extensions are intended for Pandas, and attempt to
 ``import pandas``. Pandas must be available (installed) in your
 environment.
 
@@ -47,7 +47,7 @@ class DataFramePgCopyTo:
     Pandas ``DataFrame``::
 
         >>> from sqlalchemy import create_engine
-        >>> engine = create_engine('sqlite://', echo=False)
+        >>> engine = create_engine('postgresql://')
 
         >>> df = pandas.DataFrame({'name' : ['User 1', 'User 2', 'User 3']})
 
@@ -111,7 +111,7 @@ def data_frame_pg_copy_from(sql, engine,
     For example, given a SQLAlchemy database connection engine::
 
         >>> from sqlalchemy import create_engine
-        >>> engine = create_engine('sqlite://', echo=False)
+        >>> engine = create_engine('postgresql://')
 
     We may simply invoke the ``DataFrame``'s Ohio extension method,
     ``pg_copy_from``::
