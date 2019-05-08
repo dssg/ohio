@@ -2,19 +2,8 @@ import functools
 
 import numpy as np
 import pytest
-import sqlalchemy
-import testing.postgresql
 
 from ohio.ext import numpy as op
-
-
-# FIXME: use shared once that's merged
-@pytest.fixture
-def engine():
-    with testing.postgresql.Postgresql() as postgresql:
-        engine = sqlalchemy.create_engine(postgresql.url())
-        yield engine
-        engine.dispose()
 
 
 @pytest.fixture(name='test_engine')

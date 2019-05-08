@@ -8,14 +8,6 @@ import pytest
 import ohio.ext.pandas  # noqa
 
 
-@pytest.fixture
-def engine():
-    with testing.postgresql.Postgresql() as postgresql:
-        engine = sqlalchemy.create_engine(postgresql.url())
-        yield engine
-        engine.dispose()
-
-
 def get_connectable(engine, use_conn):
     return engine.connect() if use_conn else engine
 
