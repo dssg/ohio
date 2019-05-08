@@ -390,8 +390,8 @@ significantly boost speed, with a minimum of boilerplate.
    some sort of iterator). Its output can then, far more simply and
    easily, be streamed to some input. If your input must be ``read``
    from a file-like object, see ``ohio.IteratorTextIO``. If your
-   output must be CSV-encoded, see ``ohio.encode_csv`` and
-   ``ohio.CsvWriterTextIO``.
+   output must be CSV-encoded, see ``ohio.encode_csv``,
+   ``ohio.CsvTextIO`` and ``ohio.CsvWriterTextIO``.
 
    ``PipeTextIO`` is suitable for situations where output *must* be
    written to a file-like object, which is made blocking to enforce
@@ -400,8 +400,8 @@ significantly boost speed, with a minimum of boilerplate.
    ``PipeTextIO`` is not “seekable,” but supports all other typical,
    read-write file-like features.
 
-   For example, consider the following callable, requiring a file-like
-   object, to which to write:
+   For example, consider the following callable, (artificially)
+   requiring a file-like object, to which to write:
 
    ::
 
@@ -413,7 +413,8 @@ significantly boost speed, with a minimum of boilerplate.
       ...     file_like.write("All right, later :-)\r\n")
       ...     print('[writer]', "Done.")
 
-   Most typically, we might *read* this content as follows:
+   Most typically, we might *read* this content as follows, using
+   either the ``PipeTextIO`` constructor or its ``pipe_text`` helper:
 
    ::
 
@@ -421,7 +422,7 @@ significantly boost speed, with a minimum of boilerplate.
       ...     for line in pipe:
       ...         ...
 
-   And, this is recommended. However, for the sake of example,
+   And, this syntax is recommended. However, for the sake of example,
    consider the following:
 
    ::
@@ -444,12 +445,11 @@ significantly boost speed, with a minimum of boilerplate.
       'All right, later :-)\r\n'
 
    In the above example, ``write_output`` requires a file-like
-   interface to which to write its output; and, we presume that there
-   is no alternative to this implementation, (such as a generator),
-   **and** that its output is large enough that we don’t want to hold
-   it in memory. And, in the case that we don’t want this output
-   written to the file system, we are enabled to read it directly, in
-   chunks.
+   interface to which to write its output; (and, we presume that there
+   is no alternative to this implementation – such as a generator –
+   that its output is large enough that we don’t want to hold it in
+   memory **and** that we don’t need this output written to the file
+   system). We are enabled to read it directly, in chunks:
 
    ..
 
@@ -530,6 +530,16 @@ significantly boost speed, with a minimum of boilerplate.
       ...                    format='csv') as pipe:
       ...         reader = csv.reader(pipe)
       ...         ...
+
+   Finally, note that copying *to* the database is likely best
+   performed via ``ohio.CsvTextIO``, (though copying *from* requires
+   ``PipeTextIO``, as above):
+
+   ::
+
+      >>> with ohio.CsvTextIO(data_rows) as csv_buffer, \
+      ...      connection.cursor() as cursor:
+      ...     cursor.copy_from(csv_buffer, 'my_table', format='csv')
 
 
 baseio
