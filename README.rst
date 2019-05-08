@@ -31,9 +31,15 @@ Contents
 
       * `Extensions`_
 
-         * `Extensions for pandas`_
+         * `Extensions for NumPy`_
+
+         * `Extensions for Pandas`_
 
          * `Benchmarking`_
+
+      * `Recipes`_
+
+         * `dbjoin`_
 
 
 Installation
@@ -49,10 +55,6 @@ available from `pypi.org <https://pypi.org/project/ohio/>`_:
 
 Modules
 =======
-
-   * `Recipes`_
-
-      * `dbjoin`_
 
 
 csvio
@@ -556,7 +558,105 @@ Extensions
 Modules integrating Ohio with the toolsets that need it.
 
 
-Extensions for pandas
+Extensions for NumPy
+~~~~~~~~~~~~~~~~~~~~
+
+This module enables writing NumPy array data to database and
+populating arrays from database via PostgreSQL ``COPY``. The operation
+is ensured, by Ohio, to be memory-efficient.
+
+**Note**: This integration is intended for NumPy, and attempts to
+``import numpy``. NumPy must be available (installed) in your
+environment.
+
+**ohio.ext.numpy.pg_copy_to_table(arr, table_name, connectable,
+columns=None, fmt=None)**
+
+   Copy ``array`` to database table via PostgreSQL ``COPY``.
+
+   ``ohio.PipeTextIO`` enables the direct, in-process “piping” of
+   ``array`` CSV into the “standard input” of the PostgreSQL ``COPY``
+   command, for quick, memory-efficient database persistence, (and
+   without the needless involvement of the local file system).
+
+   For example, given a SQLAlchemy ``connectable`` – either a database
+   connection ``Engine`` or ``Connection`` – and a NumPy ``array``:
+
+   ::
+
+      >>> from sqlalchemy import create_engine
+      >>> engine = create_engine('postgresql://')
+
+      >>> arr = numpy.array([1.000102487, 5.982, 2.901, 103.929])
+
+   We may persist this data to an existing table – *e.g.* “data”:
+
+   ::
+
+      >>> pg_copy_to_table(arr, 'data', engine, columns=['value'])
+
+   ``pg_copy_to_table`` utilizes ``numpy.savetxt`` and supports its
+   ``fmt`` parameter.
+
+**ohio.ext.numpy.pg_copy_from_table(table_name, connectable, dtype,
+columns=None)**
+
+   Construct ``array`` from database table via PostgreSQL ``COPY``.
+
+   ``ohio.PipeTextIO`` enables the in-process “piping” of the
+   PostgreSQL ``COPY`` command into NumPy’s ``fromiter``, for quick,
+   memory-efficient construction of ``array`` from database, (and
+   without the needless involvement of the local file system).
+
+   For example, given a SQLAlchemy ``connectable`` – either a database
+   connection ``Engine`` or ``Connection``:
+
+   ::
+
+      >>> from sqlalchemy import create_engine
+      >>> engine = create_engine('postgresql://')
+
+   We may construct a NumPy ``array`` from the contents of a specified
+   table:
+
+   ::
+
+      >>> arr = pg_copy_from_table(
+      ...     'data',
+      ...     engine,
+      ...     float,
+      ... )
+
+**ohio.ext.numpy.pg_copy_from_query(query, connectable, dtype)**
+
+   Construct ``array`` from database ``query`` via PostgreSQL
+   ``COPY``.
+
+   ``ohio.PipeTextIO`` enables the in-process “piping” of the
+   PostgreSQL ``COPY`` command into NumPy’s ``fromiter``, for quick,
+   memory-efficient construction of ``array`` from database, (and
+   without the needless involvement of the local file system).
+
+   For example, given a SQLAlchemy ``connectable`` – either a database
+   connection ``Engine`` or ``Connection``:
+
+   ::
+
+      >>> from sqlalchemy import create_engine
+      >>> engine = create_engine('postgresql://')
+
+   We may construct a NumPy ``array`` from a given query:
+
+   ::
+
+      >>> arr = pg_copy_from_query(
+      ...     'select value0, value1, value3 from data',
+      ...     engine,
+      ...     float,
+      ... )
+
+
+Extensions for Pandas
 ~~~~~~~~~~~~~~~~~~~~~
 
 This module extends ``pandas.DataFrame`` with methods ``pg_copy_to``
@@ -582,7 +682,7 @@ package:
 then in its ``__init__.py``, to ensure that extensions are loaded
 before your code, which uses them, is run.
 
-**NOTE**: These extensions are intended for Pandas, and attempt to
+**Note**: These extensions are intended for Pandas, and attempt to
 ``import pandas``. Pandas must be available (installed) in your
 environment.
 
@@ -596,13 +696,14 @@ environment.
    quick, memory-efficient database persistence, (and without the
    needless involvement of the local file system).
 
-   For example, given a SQLAlchemy database connection engine and a
-   Pandas ``DataFrame``:
+   For example, given a SQLAlchemy ``connectable`` – either a database
+   connection ``Engine`` or ``Connection`` – and a Pandas
+   ``DataFrame``:
 
    ::
 
       >>> from sqlalchemy import create_engine
-      >>> engine = create_engine('sqlite://', echo=False)
+      >>> engine = create_engine('postgresql://')
 
       >>> df = pandas.DataFrame({'name' : ['User 1', 'User 2', 'User 3']})
 
@@ -624,9 +725,9 @@ data_iter)**
    This implements a pandas ``to_sql`` “method”, utilizing
    ``ohio.CsvTextIO`` for performance stability.
 
-**ohio.ext.pandas.data_frame_pg_copy_from(sql, engine, index_col=None,
-parse_dates=False, columns=None, dtype=None, nrows=None,
-buffer_size=100)**
+**ohio.ext.pandas.data_frame_pg_copy_from(sql, connectable,
+index_col=None, parse_dates=False, columns=None, dtype=None,
+nrows=None, buffer_size=100)**
 
    ``pg_copy_from``: Construct ``DataFrame`` from database table or
    query via PostgreSQL ``COPY``.
@@ -636,12 +737,13 @@ buffer_size=100)**
    memory-efficient construction of ``DataFrame`` from database, (and
    without the needless involvement of the local file system).
 
-   For example, given a SQLAlchemy database connection engine:
+   For example, given a SQLAlchemy ``connectable`` – either a database
+   connection ``Engine`` or ``Connection``:
 
    ::
 
       >>> from sqlalchemy import create_engine
-      >>> engine = create_engine('sqlite://', echo=False)
+      >>> engine = create_engine('postgresql://')
 
    We may simply invoke the ``DataFrame``’s Ohio extension method,
    ``pg_copy_from``:
@@ -747,14 +849,14 @@ copy_stringio_to_db
 
 
 Recipes
-=======
+-------
 
 Stand-alone modules implementing functionality which depends upon Ohio
 primitives.
 
 
 dbjoin
-------
+~~~~~~
 
 Join the “COPY” results of arbitrary database queries in Python,
 without unnecessary memory overhead.
