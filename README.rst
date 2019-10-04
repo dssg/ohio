@@ -736,8 +736,8 @@ data_iter)**
    ``ohio.CsvTextIO`` for performance stability.
 
 **ohio.ext.pandas.data_frame_pg_copy_from(sql, connectable,
-index_col=None, parse_dates=False, columns=None, dtype=None,
-nrows=None, buffer_size=100)**
+schema=None, index_col=None, parse_dates=False, columns=None,
+dtype=None, nrows=None, buffer_size=100)**
 
    ``pg_copy_from``: Construct ``DataFrame`` from database table or
    query via PostgreSQL ``COPY``.

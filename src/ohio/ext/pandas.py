@@ -97,8 +97,8 @@ def to_sql_method_pg_copy_to(table, conn, keys, data_iter):
 
 
 def data_frame_pg_copy_from(sql, connectable,
-                            index_col=None, parse_dates=False, columns=None,
-                            dtype=None, nrows=None,
+                            schema=None, index_col=None, parse_dates=False,
+                            columns=None, dtype=None, nrows=None,
                             buffer_size=100):
     """``pg_copy_from``: Construct ``DataFrame`` from database table or
     query via PostgreSQL ``COPY``.
@@ -134,21 +134,34 @@ def data_frame_pg_copy_from(sql, connectable,
     pandas_sql = pandas.io.sql.SQLDatabase(connectable)
 
     try:
-        is_table_name = pandas_sql.has_table(sql)
+        is_table_name = pandas_sql.has_table(sql, schema)
     except Exception:
         # using generic exception to catch errors from sql drivers (GH24988)
         is_table_name = False
 
     if is_table_name:
+        table_name = '{}.{}'.format(schema, sql) if schema else sql
+
         if columns:
             source = "{} ({})".format(
-                sql,
+                table_name,
                 ', '.join('"{}"'.format(column) for column in columns),
             )
         else:
-            source = sql
-    elif columns:
-        raise TypeError("'columns' supported only when copying from table")
+            source = table_name
+    elif columns or schema:
+        if ' ' in sql:
+            hint = ""
+        else:
+            if schema:
+                schema_description = 'schema {!r}'.format(schema)
+            else:
+                schema_description = 'default schema'
+
+            hint = " (hint: no such table {!r} found under {})".format(sql, schema_description)
+
+        raise TypeError("keyword arguments 'columns' and 'schema' supported "
+                        "only when copying from table" + hint)
     else:
         source = "({})".format(sql)
 

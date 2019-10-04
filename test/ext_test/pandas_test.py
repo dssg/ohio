@@ -60,7 +60,8 @@ class TestPandasExtPgCopyTo:
 class TestPandasExtPgCopyFrom:
 
     @parametrize_connectable
-    def test_pg_copy_from(self, engine, use_conn):
+    @pytest.mark.parametrize('schema', (None, 'test_copy_from'))
+    def test_pg_copy_from(self, engine, schema, use_conn):
         users = (
             ('Alice', datetime(2019, 1, 2, 13, 0, 0), 302.1),
             ('Bob', datetime(2018, 10, 20, 8, 7, 10), 2.4),
@@ -68,9 +69,16 @@ class TestPandasExtPgCopyFrom:
             ('Denise', datetime(2019, 3, 2, 9, 26, 22), 3005.102),
         )
 
+        if schema:
+            table_sql = f'{schema}.users'
+            with engine.connect() as conn:
+                conn.execute(f'create schema {schema}')
+        else:
+            table_sql = 'users'
+
         with engine.connect() as conn:
             conn.execute(
-                "create table users ("
+                f"create table {table_sql} ("
                 "    id serial,"
                 "    name varchar,"
                 "    last_login timestamp,"
@@ -80,7 +88,7 @@ class TestPandasExtPgCopyFrom:
 
             for user in users:
                 conn.execute(
-                    "insert into users "
+                    f"insert into {table_sql} "
                     "   (name, last_login, tetris_high_score) "
                     "values (%s, %s, %s)",
                     user
@@ -89,6 +97,7 @@ class TestPandasExtPgCopyFrom:
         df = pandas.DataFrame.pg_copy_from(
             'users',
             get_connectable(engine, use_conn),
+            schema=schema,
             index_col='id',
             parse_dates=['last_login'],
         )
