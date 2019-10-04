@@ -113,7 +113,7 @@ Modules
     .. Also note the query string ?sanitize=true
        This is necessary to ensure that SVG is returned with the image content type.
 
-    .. image:: https://raw.githubusercontent.com/dssg/ohio/0.4.0/doc/img/profile-copy-from-database-to-datafram-1554345457.svg?sanitize=true
+    .. image:: https://raw.githubusercontent.com/dssg/ohio/0.5.0/doc/img/profile-copy-from-database-to-datafram-1554345457.svg?sanitize=true
 
     ohio_pg_copy_from_X
         ``pg_copy_from(buffer_size=X)``
@@ -141,7 +141,7 @@ Modules
         ``COPY`` to a ``StringIO``, from which pandas constructs a
         ``DataFrame``.
 
-    .. image:: https://raw.githubusercontent.com/dssg/ohio/0.4.0/doc/img/profile-copy-from-dataframe-to-databas-1555458507.svg?sanitize=true
+    .. image:: https://raw.githubusercontent.com/dssg/ohio/0.5.0/doc/img/profile-copy-from-dataframe-to-databas-1555458507.svg?sanitize=true
 
     ohio_pg_copy_to
         ``pg_copy_to()``
