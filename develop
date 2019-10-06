@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+#
+# install-cli
+#
+# Don't like sh/bash/etc? Sure.
+#
+# Love sh/bash/etc? Yeah, but....
+#
+# Let's use it here, to bootstrap whatever tools/libraries/etc. we
+# *really* love for our project.
+#
+
+# Update INSTALL_VERSION to require the version of install-cli this
+# script expects
+INSTALL_VERSION=0.0.7
+
+#
+# start bootstrap installation lib
+#
+# This is a *bit* of boilerplate to ensure we've downloaded the correct
+# version of install-cli. (You probably don't need to touch this.)
+#
+
+INSTALL_FILE=.install.${INSTALL_VERSION//./-}.bash.inc
+
+INSTALL_URL=https://raw.githubusercontent.com/dssg/install-cli/$INSTALL_VERSION/install.bash.inc
+
+[ -f $INSTALL_FILE ] || curl -#L $INSTALL_URL -o $INSTALL_FILE
+
+. $INSTALL_FILE
+
+#
+# end bootstrap installation lib
+#
+
+#
+# start project check/install
+#
+# This is your time to shine!
+# Invoke 'require' to ensure your project's basic requirements are met.
+#
+
+#
+# NOTE: This would be well-served by pipenv!
+#
+# NOTE: However, we want to make sure that contributor can manage environment as
+# NOTE: simply and straight-forwardly as possible; and, without built-in, automatic
+# NOTE: activation of `pipenv shell`, this would be yet another thing for contributors
+# NOTE: to know and do.
+#
+# NOTE: Therefore, pipenv should definitely be explored for meeting similar requirements
+# NOTE: in proper software-development projects. But, here, we'll just try to get
+# NOTE: folks up-and-running simply, (and in such a way that doesn't preclude a
+# NOTE: proper virtualenv/pyenv environment having already been provisioned).
+#
+
+# pyenv
+
+pyenv_bin="${PYENV_ROOT:-$HOME/.pyenv}/bin"
+
+exists_pyenv() {
+  [ -d "$pyenv_bin" ]
+}
+
+boostrap_pyenv() {
+  export PATH="$pyenv_bin:$PATH"
+
+  eval "$(pyenv init -)"
+  eval "$(pyenv virtualenv-init -)"
+}
+
+install_pyenv() {
+  curl -#L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
+
+  boostrap_pyenv  # bootstrap for subsequent commands
+}
+
+require pyenv \
+  exists_pyenv \
+  install_pyenv \
+  --fail-prefix="OPTIONAL dependency not found"
+
+if exists_pyenv
+then
+  echo
+  icli::set_context pyenv
+
+  if icli::check_command pyenv
+  then
+    icli::message "${T_FGREEN}initialized ✓"
+  else
+    icli::message "${T_FRED}not set up ✗"
+    icli::message
+    icli::message "${T_FYELLOW}hint: add the following lines to your .bashrc, .bash_profile or .zshenv, $(tput sitm)etc."
+    icli::message
+    icli::message '\texport PATH="~/.pyenv/bin:$PATH"'
+    icli::message '\teval "$(pyenv init -)"'
+    icli::message '\teval "$(pyenv virtualenv-init -)"'
+    icli::message
+    icli::message "${T_FMAGENTA}reference: https://github.com/pyenv/pyenv"
+    icli::message "${T_FMAGENTA}reference: https://github.com/pyenv/pyenv-installer/"
+
+    boostrap_pyenv  # bootstrap for subsequent commands
+  fi
+
+  icli::unset_context
+fi
+
+# python
+
+which_python_min() {
+  # return name of available python command at newest version meeting
+  # given minimum requirement
+  #
+  local min_version="$1"
+
+  local installed_info python_exe
+
+  for python_exe in $(compgen -c python | grep -E "^python[.0-9]*$" | sort -ru); do
+    installed_info="$($python_exe --version 2> /dev/null)"
+    if [ $? = 0 ] && [ -z "$installed_info" ]; then
+      # python <3.4 printed version to stderr
+      installed_info="$($python_exe --version 2>&1)"
+    fi
+
+    icli::vercomp "${installed_info#* }" $min_version
+    if [ $? = 2 ]; then
+      # (continue to next)
+      :
+    else
+      # we have a winner
+      echo $python_exe
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+VENV_NAME="$(<.python-version.current)"
+
+PY_VERSION="${VENV_NAME#ohio-}"
+
+PY_REQUIRED="python${PY_VERSION}"
+
+if icli::check_command pyenv; then
+  PYTHON_EXE=python
+
+  exists_python () {
+    pyenv versions --bare --skip-aliases | grep -E "^${PY_VERSION}$" > /dev/null
+  }
+
+  install_python() {
+    pyenv install -s $PY_VERSION
+  }
+
+  require $PY_REQUIRED \
+    exists_python \
+    install_python \
+    --fail-prefix="v${PY_VERSION} not found"
+else
+  PYTHON_EXE=$(which_python_min $PY_VERSION)
+
+  PYTHON_OK=$?
+
+  exists_python() {
+    return $PYTHON_OK
+  }
+
+  require $PY_REQUIRED \
+    exists_python \
+    --fail-prefix="v${PY_VERSION} (or better) not found" \
+    --fail-with="please install"
+fi
+
+# virtualenv
+
+if icli::check_command pyenv; then
+  exists_virtualenv() {
+    pyenv versions --bare --skip-aliases | grep -qE "${VENV_NAME}$"
+  }
+
+  install_virtualenv() {
+    pyenv virtualenv $PY_VERSION "$VENV_NAME"
+    ln -s .python-version.current .python-version
+  }
+else
+  exists_virtualenv() {
+    local installed_info
+
+    if [ -n "$VIRTUAL_ENV" ]; then
+      installed_info="$("$VIRTUAL_ENV"/bin/python --version 2> /dev/null)"
+      icli::vercomp "${installed_info#* }" $PY_VERSION
+      [ $? != 2 ]
+    else
+      [ -f .env/bin/activate ]
+    fi
+  }
+
+  install_virtualenv () {
+    $PYTHON_EXE -m venv --upgrade --prompt="$VENV_NAME" .env
+  }
+fi
+
+require venv \
+  exists_virtualenv \
+  install_virtualenv \
+  --fail-prefix="project virtual environment \"$VENV_NAME\" not found"
+
+# python libs
+
+if icli::check_command pyenv; then
+  if [ "$(pyenv version-name)" != "$VENV_NAME" ]; then
+    PYTHON_EXE="${PYENV_ROOT:-$HOME/.pyenv}/versions/$VENV_NAME/bin/python"
+  fi
+elif [ -f .env/bin/activate ]; then
+  PYTHON_EXE=.env/bin/python
+fi
+
+PIP_FLAGS=""
+if [ -z "$VIRTUAL_ENV" ]; then
+  PIP_FLAGS="--user"
+fi
+
+install_lib() {
+  $PYTHON_EXE -m pip install $PIP_FLAGS -r requirement/dev.txt
+}
+
+# no great way to check that python libs installed;
+# rather, always fail check and let pip figure it out
+require lib \
+  icli::always_install \
+  install_lib \
+  --fail-message="install libraries (via executable \`$PYTHON_EXE\`)?"
+
+echo
+icli::set_context hint
+icli::message "${T_FCYAN}now try: ${T_0}manage --help \U1F914"
+icli::unset_context
+
+#
+# end project check/install
+#
