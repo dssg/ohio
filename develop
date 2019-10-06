@@ -209,16 +209,15 @@ require venv \
 
 # python libs
 
+PIP_FLAGS=""
+
 if icli::check_command pyenv; then
   if [ "$(pyenv version-name)" != "$VENV_NAME" ]; then
     PYTHON_EXE="${PYENV_ROOT:-$HOME/.pyenv}/versions/$VENV_NAME/bin/python"
   fi
 elif [ -f .env/bin/activate ]; then
   PYTHON_EXE=.env/bin/python
-fi
-
-PIP_FLAGS=""
-if [ -z "$VIRTUAL_ENV" ]; then
+elif [ -z "$VIRTUAL_ENV" ]; then
   PIP_FLAGS="--user"
 fi
 
