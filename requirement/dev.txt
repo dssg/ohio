@@ -1,5 +1,5 @@
 argcmdr==0.6.0
-bump2version==0.5.10
-tox==3.7.0
-twine==1.13.0
-wheel==0.33.1
+bump2version==1.0.1
+tox==3.20.0
+twine==1.15.0
+wheel==0.37.0
