@@ -8,13 +8,6 @@ import pytest
 import ohio.ext.pandas  # noqa
 
 
-def get_connectable(engine, use_conn):
-    return engine.connect() if use_conn else engine
-
-
-parametrize_connectable = pytest.mark.parametrize('use_conn', (True, False))
-
-
 class TestPandasExtPgCopyTo:
 
     names = ('Alice', 'Bob', 'Conner', 'Denise')
@@ -44,11 +37,10 @@ class TestPandasExtPgCopyTo:
         assert 'pg_copy_to' in members
         assert 'pg_copy_from' not in members
 
-    @parametrize_connectable
-    def test_pg_copy_to(self, engine, df, use_conn):
+    def test_pg_copy_to(self, engine, df):
         assert not self.table_exists('users', engine)
 
-        df.pg_copy_to('users', get_connectable(engine, use_conn))
+        df.pg_copy_to('users', engine)
 
         assert self.table_exists('users', engine)
 
@@ -59,9 +51,8 @@ class TestPandasExtPgCopyTo:
 
 class TestPandasExtPgCopyFrom:
 
-    @parametrize_connectable
     @pytest.mark.parametrize('schema', (None, 'test_copy_from'))
-    def test_pg_copy_from(self, engine, schema, use_conn):
+    def test_pg_copy_from(self, engine, schema):
         users = (
             ('Alice', datetime(2019, 1, 2, 13, 0, 0), 302.1),
             ('Bob', datetime(2018, 10, 20, 8, 7, 10), 2.4),
@@ -96,7 +87,7 @@ class TestPandasExtPgCopyFrom:
 
         df = pandas.DataFrame.pg_copy_from(
             'users',
-            get_connectable(engine, use_conn),
+            engine,
             schema=schema,
             index_col='id',
             parse_dates=['last_login'],
@@ -106,7 +97,8 @@ class TestPandasExtPgCopyFrom:
         assert df.index.dtype == 'int64'
         assert df.index.tolist() == [1, 2, 3, 4]
 
-        assert df.columns.tolist() == ['name', 'last_login', 'tetris_high_score']
+        assert df.columns.tolist() == [
+            'name', 'last_login', 'tetris_high_score']
         assert df.dtypes.to_dict() == {
             'name': 'object',
             'last_login': 'datetime64[ns]',
