@@ -60,6 +60,7 @@ class DataFramePgCopyTo:
     (excepting parameter ``method``).
 
     """
+
     def __init__(self, data_frame):
         self.data_frame = data_frame
 
@@ -72,7 +73,7 @@ class DataFramePgCopyTo:
         )
 
 
-def to_sql_method_pg_copy_to(table, conn, keys, data_iter):
+def to_sql_method_pg_copy_to(table, engine, keys, data_iter):
     """Write pandas data to table via stream through PostgreSQL
     ``COPY``.
 
@@ -91,12 +92,13 @@ def to_sql_method_pg_copy_to(table, conn, keys, data_iter):
         columns=columns,
     )
 
-    with ohio.CsvTextIO(data_iter) as csv_buffer, \
-            conn.connection.cursor() as cursor:
-        cursor.copy_expert(sql, csv_buffer)
+    with ohio.CsvTextIO(data_iter) as csv_buffer:
+        with engine.connect() as conn:
+            with conn.connection.cursor() as cursor:
+                cursor.copy_expert(sql, csv_buffer)
 
 
-def data_frame_pg_copy_from(sql, connectable,
+def data_frame_pg_copy_from(sql, engine,
                             schema=None, index_col=None, parse_dates=False,
                             columns=None, dtype=None, nrows=None,
                             buffer_size=100):
@@ -131,7 +133,7 @@ def data_frame_pg_copy_from(sql, connectable,
     ``100``.
 
     """
-    pandas_sql = pandas.io.sql.SQLDatabase(connectable)
+    pandas_sql = pandas.io.sql.SQLDatabase(engine)
 
     try:
         is_table_name = pandas_sql.has_table(sql, schema)
@@ -158,29 +160,31 @@ def data_frame_pg_copy_from(sql, connectable,
             else:
                 schema_description = 'default schema'
 
-            hint = " (hint: no such table {!r} found under {})".format(sql, schema_description)
+            hint = " (hint: no such table {!r} found under {})".format(
+                sql, schema_description)
 
         raise TypeError("keyword arguments 'columns' and 'schema' supported "
                         "only when copying from table" + hint)
     else:
         source = "({})".format(sql)
 
-    with connectable.connect() as conn:
-        cursor = conn.connection.cursor()
+    with engine.connect() as conn:
+        with conn.connection.cursor() as cursor:
 
-        writer = functools.partial(
-            cursor.copy_expert,
-            'COPY {source} TO STDOUT WITH CSV HEADER'.format(source=source),
-        )
-
-        with ohio.pipe_text(writer, buffer_size=buffer_size) as pipe:
-            return pandas.read_csv(
-                pipe,
-                index_col=index_col,
-                parse_dates=parse_dates,
-                dtype=dtype,
-                nrows=nrows,
+            writer = functools.partial(
+                cursor.copy_expert,
+                'COPY {source} TO STDOUT WITH CSV HEADER'.format(
+                    source=source),
             )
+
+            with ohio.pipe_text(writer, buffer_size=buffer_size) as pipe:
+                return pandas.read_csv(
+                    pipe,
+                    index_col=index_col,
+                    parse_dates=parse_dates,
+                    dtype=dtype,
+                    nrows=nrows,
+                )
 
 
 @pandas.api.extensions.register_dataframe_accessor('pg_copy_from')
