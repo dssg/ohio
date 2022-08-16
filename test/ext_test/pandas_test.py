@@ -1,3 +1,4 @@
+import contextlib
 import operator
 from datetime import datetime
 
@@ -8,8 +9,8 @@ import pytest
 import ohio.ext.pandas  # noqa
 
 
-def get_connectable(engine, use_conn):
-    return engine.connect() if use_conn else engine
+def connectable(engine, use_conn):
+    return engine.begin() if use_conn else contextlib.nullcontext(engine)
 
 
 parametrize_connectable = pytest.mark.parametrize('use_conn', (True, False))
@@ -48,7 +49,8 @@ class TestPandasExtPgCopyTo:
     def test_pg_copy_to(self, engine, df, use_conn):
         assert not self.table_exists('users', engine)
 
-        df.pg_copy_to('users', get_connectable(engine, use_conn))
+        with connectable(engine, use_conn) as conn:
+            df.pg_copy_to('users', conn)
 
         assert self.table_exists('users', engine)
 
@@ -94,13 +96,14 @@ class TestPandasExtPgCopyFrom:
                     user
                 )
 
-        df = pandas.DataFrame.pg_copy_from(
-            'users',
-            get_connectable(engine, use_conn),
-            schema=schema,
-            index_col='id',
-            parse_dates=['last_login'],
-        )
+        with connectable(engine, use_conn) as conn:
+            df = pandas.DataFrame.pg_copy_from(
+                'users',
+                conn,
+                schema=schema,
+                index_col='id',
+                parse_dates=['last_login'],
+            )
 
         assert df.index.name == 'id'
         assert df.index.dtype == 'int64'
